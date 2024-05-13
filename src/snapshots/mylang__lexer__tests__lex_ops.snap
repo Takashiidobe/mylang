@@ -1,0 +1,115 @@
+---
+source: src/lexer.rs
+expression: lexer.lex()
+---
+- type: Op
+  loc:
+    line: 1
+    col: 0
+  len: 2
+  value:
+    Op: BangEqual
+- type: Op
+  loc:
+    line: 1
+    col: 1
+  len: 1
+  value:
+    Op: Equal
+- type: Op
+  loc:
+    line: 1
+    col: 3
+  len: 1
+  value:
+    Op: Lt
+- type: Op
+  loc:
+    line: 1
+    col: 5
+  len: 2
+  value:
+    Op: Le
+- type: Op
+  loc:
+    line: 1
+    col: 6
+  len: 1
+  value:
+    Op: Equal
+- type: Op
+  loc:
+    line: 1
+    col: 8
+  len: 1
+  value:
+    Op: Gt
+- type: Op
+  loc:
+    line: 1
+    col: 10
+  len: 2
+  value:
+    Op: Ge
+- type: Op
+  loc:
+    line: 1
+    col: 11
+  len: 1
+  value:
+    Op: Equal
+- type: Op
+  loc:
+    line: 1
+    col: 13
+  len: 2
+  value:
+    Op: EqualEqual
+- type: Op
+  loc:
+    line: 1
+    col: 14
+  len: 1
+  value:
+    Op: Equal
+- type: Op
+  loc:
+    line: 1
+    col: 16
+  len: 1
+  value:
+    Op: Equal
+- type: Op
+  loc:
+    line: 1
+    col: 18
+  len: 1
+  value:
+    Op: Star
+- type: Op
+  loc:
+    line: 1
+    col: 20
+  len: 1
+  value:
+    Op: Plus
+- type: Op
+  loc:
+    line: 1
+    col: 22
+  len: 1
+  value:
+    Op: Minus
+- type: Op
+  loc:
+    line: 1
+    col: 24
+  len: 1
+  value:
+    Op: Slash
+- type: Eof
+  loc:
+    line: 1
+    col: 25
+  len: 0
+  value: ~

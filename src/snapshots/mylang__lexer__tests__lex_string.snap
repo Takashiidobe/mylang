@@ -1,0 +1,17 @@
+---
+source: src/lexer.rs
+expression: lexer.lex()
+---
+- type: String
+  loc:
+    line: 1
+    col: 0
+  len: 5
+  value:
+    String: hello
+- type: Eof
+  loc:
+    line: 1
+    col: 8
+  len: 0
+  value: ~

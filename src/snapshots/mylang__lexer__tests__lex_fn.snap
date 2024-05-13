@@ -1,0 +1,80 @@
+---
+source: src/lexer.rs
+expression: lexer.lex()
+---
+- type: Keyword
+  loc:
+    line: 1
+    col: 0
+  len: 2
+  value:
+    Keyword: Function
+- type: Identifier
+  loc:
+    line: 1
+    col: 3
+  len: 3
+  value:
+    Identifier: xyz
+- type: Punct
+  loc:
+    line: 1
+    col: 7
+  len: 1
+  value:
+    Punct: LParen
+- type: Identifier
+  loc:
+    line: 1
+    col: 8
+  len: 1
+  value:
+    Identifier: x
+- type: Identifier
+  loc:
+    line: 1
+    col: 11
+  len: 1
+  value:
+    Identifier: y
+- type: Identifier
+  loc:
+    line: 1
+    col: 14
+  len: 1
+  value:
+    Identifier: z
+- type: Punct
+  loc:
+    line: 1
+    col: 17
+  len: 1
+  value:
+    Punct: LBrace
+- type: Keyword
+  loc:
+    line: 1
+    col: 19
+  len: 6
+  value:
+    Keyword: Return
+- type: Identifier
+  loc:
+    line: 1
+    col: 26
+  len: 1
+  value:
+    Identifier: y
+- type: Punct
+  loc:
+    line: 1
+    col: 29
+  len: 1
+  value:
+    Punct: RBrace
+- type: Eof
+  loc:
+    line: 1
+    col: 30
+  len: 0
+  value: ~

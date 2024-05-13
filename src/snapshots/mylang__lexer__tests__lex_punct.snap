@@ -1,0 +1,73 @@
+---
+source: src/lexer.rs
+expression: lexer.lex()
+---
+- type: Punct
+  loc:
+    line: 1
+    col: 0
+  len: 1
+  value:
+    Punct: LBracket
+- type: Punct
+  loc:
+    line: 1
+    col: 1
+  len: 1
+  value:
+    Punct: RBracket
+- type: Punct
+  loc:
+    line: 1
+    col: 2
+  len: 1
+  value:
+    Punct: LBrace
+- type: Punct
+  loc:
+    line: 1
+    col: 3
+  len: 1
+  value:
+    Punct: RBrace
+- type: Punct
+  loc:
+    line: 1
+    col: 4
+  len: 1
+  value:
+    Punct: LParen
+- type: Punct
+  loc:
+    line: 1
+    col: 5
+  len: 1
+  value:
+    Punct: RParen
+- type: Punct
+  loc:
+    line: 1
+    col: 6
+  len: 1
+  value:
+    Punct: Semicolon
+- type: Punct
+  loc:
+    line: 1
+    col: 7
+  len: 1
+  value:
+    Punct: Comma
+- type: Punct
+  loc:
+    line: 1
+    col: 8
+  len: 1
+  value:
+    Punct: Dot
+- type: Eof
+  loc:
+    line: 1
+    col: 9
+  len: 0
+  value: ~

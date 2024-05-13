@@ -1,0 +1,17 @@
+---
+source: src/lexer.rs
+expression: lexer.lex()
+---
+- type: Number
+  loc:
+    line: 1
+    col: 0
+  len: 4
+  value:
+    Number: 1234
+- type: Eof
+  loc:
+    line: 1
+    col: 5
+  len: 0
+  value: ~
