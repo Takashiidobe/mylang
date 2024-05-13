@@ -9,9 +9,16 @@ expression: lexer.lex()
   len: 4
   value:
     Number: 1234
+- type: Number
+  loc:
+    line: 1
+    col: 5
+  len: 3
+  value:
+    Number: 500
 - type: Eof
   loc:
     line: 1
-    col: 4
+    col: 8
   len: 0
   value: ~

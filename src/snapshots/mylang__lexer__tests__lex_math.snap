@@ -1,0 +1,45 @@
+---
+source: src/lexer.rs
+expression: lexer.lex()
+---
+- type: Number
+  loc:
+    line: 1
+    col: 0
+  len: 2
+  value:
+    Number: 15
+- type:
+    Op: Plus
+  loc:
+    line: 1
+    col: 3
+  len: 1
+  value: ~
+- type: Number
+  loc:
+    line: 1
+    col: 5
+  len: 3
+  value:
+    Number: 300
+- type:
+    Op: Star
+  loc:
+    line: 1
+    col: 9
+  len: 1
+  value: ~
+- type: Number
+  loc:
+    line: 1
+    col: 11
+  len: 2
+  value:
+    Number: 40
+- type: Eof
+  loc:
+    line: 1
+    col: 13
+  len: 0
+  value: ~

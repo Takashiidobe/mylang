@@ -1,0 +1,7 @@
+---
+source: src/parser.rs
+expression: parser.parse().unwrap()
+---
+Literal:
+  value:
+    Bool: true

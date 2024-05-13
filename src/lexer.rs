@@ -1,4 +1,5 @@
-use std::collections::HashSet;
+use std::hash::Hash;
+use std::{collections::HashSet, fmt};
 
 #[cfg(test)]
 use serde::{Deserialize, Serialize};
@@ -48,16 +49,17 @@ pub enum Keyword {
     True,
     False,
     Return,
+    Nil,
 }
 
 #[cfg_attr(test, derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TokenType {
-    Keyword,
-    Identifier,
-    Op,
-    Punct,
+    Keyword(Keyword),
+    Op(Op),
+    Punct(Punct),
     String,
+    Identifier,
     Number,
     Eof,
 }
@@ -65,28 +67,104 @@ pub enum TokenType {
 #[cfg_attr(test, derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SourceLocation {
-    line: usize,
-    col: usize,
+    pub line: usize,
+    pub col: usize,
 }
 
 #[cfg_attr(test, derive(Serialize, Deserialize))]
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum TokenValue {
-    Op(Op),
-    Keyword(Keyword),
-    Identifier(String),
-    Punct(Punct),
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub enum Value {
     String(String),
     Number(i64),
+    Identifier(String),
+    Bool(bool),
+    #[default]
+    Nil,
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let val = match self {
+            Value::String(s) => s,
+            Value::Number(n) => &n.to_string(),
+            Value::Identifier(ident) => ident,
+            Value::Bool(b) => &b.to_string(),
+            Value::Nil => "nil",
+        };
+
+        f.write_str(val)
+    }
 }
 
 #[cfg_attr(test, derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Token {
-    r#type: TokenType,
-    loc: SourceLocation,
-    len: usize,
-    value: Option<TokenValue>,
+    pub r#type: TokenType,
+    pub loc: SourceLocation,
+    pub len: usize,
+    pub value: Option<Value>,
+}
+
+impl fmt::Display for Token {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let type_val = match &self.r#type {
+            TokenType::Op(op) => Some(match op {
+                Op::Star => "*",
+                Op::Slash => "/",
+                Op::Plus => "+",
+                Op::Minus => "-",
+                Op::And => "&&",
+                Op::Or => "||",
+                Op::Bang => "!",
+                Op::BangEqual => "!=",
+                Op::EqualEqual => "==",
+                Op::Equal => "=",
+                Op::Lt => "<",
+                Op::Le => "<=",
+                Op::Gt => ">",
+                Op::Ge => ">=",
+            }),
+            TokenType::Keyword(keyword) => Some(match keyword {
+                Keyword::Function => "fn",
+                Keyword::For => "for",
+                Keyword::While => "while",
+                Keyword::If => "if",
+                Keyword::Else => "else",
+                Keyword::Let => "let",
+                Keyword::True => "true",
+                Keyword::False => "false",
+                Keyword::Return => "return",
+                Keyword::Nil => "nil",
+            }),
+            TokenType::Punct(punct) => Some(match punct {
+                Punct::LParen => "{",
+                Punct::RParen => "}",
+                Punct::LBracket => "[",
+                Punct::RBracket => "]",
+                Punct::LBrace => "{",
+                Punct::RBrace => "}",
+                Punct::Semicolon => ";",
+                Punct::Comma => ",",
+                Punct::Dot => ".",
+            }),
+            TokenType::Eof => Some("eof"),
+            _ => None,
+        };
+
+        if let Some(val) = type_val {
+            return f.write_str(val);
+        }
+
+        let val = match &self.value.clone().unwrap() {
+            Value::String(s) => s.to_string(),
+            Value::Number(number) => number.to_string(),
+            Value::Identifier(ident) => ident.to_string(),
+            Value::Bool(b) => b.to_string(),
+            Value::Nil => "nil".to_string(),
+        };
+
+        f.write_str(&val)
+    }
 }
 
 #[cfg_attr(test, derive(Serialize, Deserialize))]
@@ -113,7 +191,7 @@ impl Lexer {
         while let Some(c) = self.peek() {
             match c {
                 '"' => tokens.push(self.string()),
-                '0'..='9' => tokens.push(self.number()),
+                '0'..='9' => tokens.push(self.number(c)),
                 'a'..='z' | 'A'..='Z' | '_' => tokens.push(self.identifier(c)),
                 '(' | ')' | '[' | ']' | '{' | '}' | ';' | ',' | '.' => tokens.push(self.punct(c)),
                 '!' | '=' | '<' | '>' | '*' | '+' | '/' | '-' => tokens.push(self.op(c)),
@@ -124,7 +202,9 @@ impl Lexer {
                 ' ' => {}
                 c => panic!("Unknown character: {c}"),
             }
-            self.incr_one();
+            if c != '\n' {
+                self.incr_one();
+            }
         }
         tokens.push(Token {
             r#type: TokenType::Eof,
@@ -153,40 +233,44 @@ impl Lexer {
         let len = chars.len();
 
         let keywords = HashSet::from([
-            "fn", "for", "while", "if", "else", "true", "false", "return",
+            "fn", "for", "while", "if", "else", "true", "false", "return", "nil",
         ]);
 
         let token_type = if keywords.contains(&chars.as_str()) {
-            TokenType::Keyword
+            if chars.as_str() == "fn" {
+                TokenType::Keyword(Keyword::Function)
+            } else if chars.as_str() == "for" {
+                TokenType::Keyword(Keyword::For)
+            } else if chars.as_str() == "while" {
+                TokenType::Keyword(Keyword::While)
+            } else if chars.as_str() == "if" {
+                TokenType::Keyword(Keyword::If)
+            } else if chars.as_str() == "else" {
+                TokenType::Keyword(Keyword::Else)
+            } else if chars.as_str() == "true" {
+                TokenType::Keyword(Keyword::True)
+            } else if chars.as_str() == "false" {
+                TokenType::Keyword(Keyword::False)
+            } else if chars.as_str() == "nil" {
+                TokenType::Keyword(Keyword::Nil)
+            } else if chars.as_str() == "return" {
+                TokenType::Keyword(Keyword::Return)
+            } else {
+                TokenType::Identifier
+            }
         } else {
             TokenType::Identifier
         };
 
-        let value = if chars.as_str() == "fn" {
-            TokenValue::Keyword(Keyword::Function)
-        } else if chars.as_str() == "for" {
-            TokenValue::Keyword(Keyword::For)
-        } else if chars.as_str() == "while" {
-            TokenValue::Keyword(Keyword::While)
-        } else if chars.as_str() == "if" {
-            TokenValue::Keyword(Keyword::If)
-        } else if chars.as_str() == "else" {
-            TokenValue::Keyword(Keyword::Else)
-        } else if chars.as_str() == "true" {
-            TokenValue::Keyword(Keyword::True)
-        } else if chars.as_str() == "false" {
-            TokenValue::Keyword(Keyword::False)
-        } else if chars.as_str() == "return" {
-            TokenValue::Keyword(Keyword::Return)
-        } else {
-            TokenValue::Identifier(chars)
-        };
-
         Token {
-            r#type: token_type,
             loc,
             len,
-            value: Some(value),
+            value: if token_type == TokenType::Identifier {
+                Some(Value::Identifier(chars.to_string()))
+            } else {
+                None
+            },
+            r#type: token_type,
         }
     }
 
@@ -200,6 +284,7 @@ impl Lexer {
             '/' => (Op::Slash, 1),
             '<' => {
                 if let Some('=') = self.peek_next() {
+                    self.incr_one();
                     (Op::Le, 2)
                 } else {
                     (Op::Lt, 1)
@@ -207,6 +292,7 @@ impl Lexer {
             }
             '>' => {
                 if let Some('=') = self.peek_next() {
+                    self.incr_one();
                     (Op::Ge, 2)
                 } else {
                     (Op::Gt, 1)
@@ -214,6 +300,7 @@ impl Lexer {
             }
             '!' => {
                 if let Some('=') = self.peek_next() {
+                    self.incr_one();
                     (Op::BangEqual, 2)
                 } else {
                     (Op::Bang, 1)
@@ -221,6 +308,7 @@ impl Lexer {
             }
             '=' => {
                 if let Some('=') = self.peek_next() {
+                    self.incr_one();
                     (Op::EqualEqual, 2)
                 } else {
                     (Op::Equal, 1)
@@ -230,10 +318,10 @@ impl Lexer {
         };
 
         Token {
-            r#type: TokenType::Op,
+            r#type: TokenType::Op(op),
             loc,
             len,
-            value: Some(TokenValue::Op(op)),
+            value: None,
         }
     }
 
@@ -254,30 +342,32 @@ impl Lexer {
         };
 
         Token {
-            r#type: TokenType::Punct,
+            r#type: TokenType::Punct(punct),
             loc,
             len: 1,
-            value: Some(TokenValue::Punct(punct)),
+            value: None,
         }
     }
 
-    fn number(&mut self) -> Token {
+    fn number(&mut self, c: char) -> Token {
         let mut chars = String::default();
+        chars.push(c);
         let loc = self.loc();
 
-        while let Some(c) = self.next() {
+        while let Some(c) = self.peek_next() {
             if c.is_ascii_digit() {
                 chars.push(c);
             } else {
                 break;
             }
+            self.incr_one();
         }
 
         Token {
             r#type: TokenType::Number,
             loc,
             len: chars.len(),
-            value: Some(TokenValue::Number(chars.parse().unwrap())),
+            value: Some(Value::Number(chars.parse().unwrap())),
         }
     }
 
@@ -299,7 +389,7 @@ impl Lexer {
             r#type: TokenType::String,
             loc,
             len: chars.len(),
-            value: Some(TokenValue::String(chars)),
+            value: Some(Value::String(chars)),
         }
     }
 
@@ -384,6 +474,12 @@ mod tests {
     }
 
     #[test]
+    fn lex_two_numbers() {
+        let mut lexer = Lexer::new("1234 500");
+        assert_yaml_snapshot!(lexer.lex());
+    }
+
+    #[test]
     fn lex_punct() {
         let mut lexer = Lexer::new("[]{}();,.");
         assert_yaml_snapshot!(lexer.lex());
@@ -392,6 +488,12 @@ mod tests {
     #[test]
     fn lex_ops() {
         let mut lexer = Lexer::new("!= < <= > >= == = * + - /");
+        assert_yaml_snapshot!(lexer.lex());
+    }
+
+    #[test]
+    fn lex_math() {
+        let mut lexer = Lexer::new("15 + 300 * 40");
         assert_yaml_snapshot!(lexer.lex());
     }
 

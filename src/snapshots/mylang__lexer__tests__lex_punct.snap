@@ -2,69 +2,69 @@
 source: src/lexer.rs
 expression: lexer.lex()
 ---
-- type: Punct
+- type:
+    Punct: LBracket
   loc:
     line: 1
     col: 0
   len: 1
-  value:
-    Punct: LBracket
-- type: Punct
+  value: ~
+- type:
+    Punct: RBracket
   loc:
     line: 1
     col: 1
   len: 1
-  value:
-    Punct: RBracket
-- type: Punct
+  value: ~
+- type:
+    Punct: LBrace
   loc:
     line: 1
     col: 2
   len: 1
-  value:
-    Punct: LBrace
-- type: Punct
+  value: ~
+- type:
+    Punct: RBrace
   loc:
     line: 1
     col: 3
   len: 1
-  value:
-    Punct: RBrace
-- type: Punct
+  value: ~
+- type:
+    Punct: LParen
   loc:
     line: 1
     col: 4
   len: 1
-  value:
-    Punct: LParen
-- type: Punct
+  value: ~
+- type:
+    Punct: RParen
   loc:
     line: 1
     col: 5
   len: 1
-  value:
-    Punct: RParen
-- type: Punct
+  value: ~
+- type:
+    Punct: Semicolon
   loc:
     line: 1
     col: 6
   len: 1
-  value:
-    Punct: Semicolon
-- type: Punct
+  value: ~
+- type:
+    Punct: Comma
   loc:
     line: 1
     col: 7
   len: 1
-  value:
-    Punct: Comma
-- type: Punct
+  value: ~
+- type:
+    Punct: Dot
   loc:
     line: 1
     col: 8
   len: 1
-  value:
-    Punct: Dot
+  value: ~
 - type: Eof
   loc:
     line: 1

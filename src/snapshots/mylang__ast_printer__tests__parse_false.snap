@@ -1,0 +1,5 @@
+---
+source: src/ast_printer.rs
+expression: AstPrinter.print(&parser.parse().unwrap())
+---
+Ok: "false"

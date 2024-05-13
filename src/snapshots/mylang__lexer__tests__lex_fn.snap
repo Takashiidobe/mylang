@@ -2,13 +2,13 @@
 source: src/lexer.rs
 expression: lexer.lex()
 ---
-- type: Keyword
+- type:
+    Keyword: Function
   loc:
     line: 1
     col: 0
   len: 2
-  value:
-    Keyword: Function
+  value: ~
 - type: Identifier
   loc:
     line: 1
@@ -16,13 +16,13 @@ expression: lexer.lex()
   len: 3
   value:
     Identifier: xyz
-- type: Punct
+- type:
+    Punct: LParen
   loc:
     line: 1
     col: 7
   len: 1
-  value:
-    Punct: LParen
+  value: ~
 - type: Identifier
   loc:
     line: 1
@@ -44,20 +44,20 @@ expression: lexer.lex()
   len: 1
   value:
     Identifier: z
-- type: Punct
+- type:
+    Punct: LBrace
   loc:
     line: 1
     col: 17
   len: 1
-  value:
-    Punct: LBrace
-- type: Keyword
+  value: ~
+- type:
+    Keyword: Return
   loc:
     line: 1
     col: 19
   len: 6
-  value:
-    Keyword: Return
+  value: ~
 - type: Identifier
   loc:
     line: 1
@@ -65,13 +65,13 @@ expression: lexer.lex()
   len: 1
   value:
     Identifier: y
-- type: Punct
+- type:
+    Punct: RBrace
   loc:
     line: 1
     col: 29
   len: 1
-  value:
-    Punct: RBrace
+  value: ~
 - type: Eof
   loc:
     line: 1
