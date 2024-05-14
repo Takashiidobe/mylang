@@ -1,8 +1,9 @@
-#[cfg(test)]
-use serde::{Deserialize, Serialize};
-
-use crate::lexer::{Keyword, Op, Punct, SourceLocation, Token, TokenType, Value};
-use std::{convert, fmt, io};
+use crate::{
+    error::Error,
+    expr::Expr,
+    lexer::{Keyword, Op, Punct, SourceLocation, Token, TokenType, Value},
+};
+use std::fmt;
 
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct Parser {
@@ -173,65 +174,6 @@ impl Parser {
     }
 }
 
-#[derive(Debug)]
-pub enum Error {
-    Io(io::Error),
-    Parse { token: Token, message: String },
-    Runtime { token: Token, message: String },
-}
-
-#[cfg(test)]
-impl Serialize for Error {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.to_string())
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::Io(underlying) => write!(f, "IoError {}", underlying),
-            Error::Parse { token, message } => {
-                write!(f, "ParseError at token: {}, message: {}", token, message)
-            }
-            Error::Runtime { token, message } => {
-                write!(f, "RuntimeError at token: {}, message: {}", token, message)
-            }
-        }
-    }
-}
-
-impl std::error::Error for Error {
-    fn description(&self) -> &str {
-        "Lox Error"
-    }
-}
-
-impl convert::From<io::Error> for Error {
-    fn from(e: io::Error) -> Self {
-        Error::Io(e)
-    }
-}
-
-#[cfg_attr(test, derive(Serialize, Deserialize))]
-#[derive(Debug, Clone, PartialEq)]
-pub enum Expr {
-    Binary {
-        left: Box<Expr>,
-        op: Token,
-        right: Box<Expr>,
-    },
-    Literal {
-        value: Value,
-    },
-    Grouping {
-        expr: Box<Expr>,
-    },
-}
-
 pub trait Visitor<R> {
     fn visit_binary_expr(&mut self, left: &Expr, op: &Token, right: &Expr) -> Result<R, Error>;
     fn visit_grouping_expr(&mut self, expr: &Expr) -> Result<R, Error>;
@@ -289,16 +231,6 @@ pub trait InterpreterErrors<R: fmt::Display> {
     }
 }
 
-impl Expr {
-    pub fn accept<R>(&self, visitor: &mut dyn Visitor<R>) -> Result<R, Error> {
-        match self {
-            Expr::Binary { left, op, right } => visitor.visit_binary_expr(left, op, right),
-            Expr::Literal { value } => visitor.visit_literal_expr(value),
-            Expr::Grouping { expr } => visitor.visit_grouping_expr(expr),
-        }
-    }
-}
-
 pub fn report(loc: &SourceLocation, message: &str) {
     eprintln!("[line {}, col {}] Error: {}", loc.line, loc.col, message);
 }
@@ -310,6 +242,7 @@ pub fn parser_error(token: &Token, message: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::expr::Expr;
     use crate::lexer::Lexer;
     use crate::parser::Parse;
     use insta::assert_yaml_snapshot;

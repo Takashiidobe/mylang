@@ -1,9 +1,10 @@
 use std::env::args;
-use std::io::stdin;
+use std::io::{stdin, stdout, Write};
 
 use mylang::asm_interpreter::Codegen;
 use mylang::ast_printer::AstPrinter;
-use mylang::bc_interpreter::{BcCompiler, BcInterpreter};
+use mylang::bc_compiler::BcCompiler;
+use mylang::bc_interpreter::BcInterpreter;
 use mylang::interpreter::AstInterpreter;
 use mylang::parser::{Interpreter, Parse};
 use mylang::{lexer::Lexer, parser::Parser};
@@ -37,6 +38,8 @@ fn main() {
 
     let mut s = String::default();
     loop {
+        print!("> ");
+        let _ = stdout().flush();
         stdin().read_line(&mut s).unwrap();
         s.pop();
         let mut lexer = Lexer::new(&s);

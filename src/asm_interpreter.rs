@@ -1,8 +1,8 @@
 use std::fmt;
 
 use crate::{
+    expr::Expr,
     lexer::{Op, Token, TokenType, Value},
-    parser::Expr,
 };
 
 pub struct Codegen {

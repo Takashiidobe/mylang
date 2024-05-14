@@ -1,6 +1,8 @@
 use crate::{
+    error::Error,
+    expr::Expr,
     lexer::{Token, Value},
-    parser::{Error, Expr, Visitor},
+    parser::Visitor,
 };
 
 pub struct AstPrinter;

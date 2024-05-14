@@ -1,6 +1,8 @@
 use crate::{
+    error::Error,
+    expr::Expr,
     lexer::{Op, Token, TokenType, Value},
-    parser::{Error, Expr, Interpreter, InterpreterErrors, Visitor},
+    parser::{Interpreter, InterpreterErrors, Visitor},
 };
 
 #[derive(Debug, Clone, PartialEq)]
