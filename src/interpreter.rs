@@ -1,12 +1,13 @@
 use crate::{
     lexer::{Op, Token, TokenType, Value},
-    parser::{Error, Expr, Interpreter, Visitor},
+    parser::{Error, Expr, Interpreter, InterpreterErrors, Visitor},
 };
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AstInterpreter;
 
 impl Interpreter<Value> for AstInterpreter {}
+impl InterpreterErrors<Value> for AstInterpreter {}
 
 impl Visitor<Value> for AstInterpreter {
     fn visit_binary_expr(

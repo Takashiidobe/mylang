@@ -1,16 +1,8 @@
 #[cfg(test)]
 use serde::{Deserialize, Serialize};
 
-use crate::lexer::Keyword;
-use crate::lexer::Op;
-use crate::lexer::Punct;
-use crate::lexer::SourceLocation;
-use crate::lexer::Token;
-use crate::lexer::TokenType;
-use crate::lexer::Value;
-use std::convert;
-use std::fmt;
-use std::io;
+use crate::lexer::{Keyword, Op, Punct, SourceLocation, Token, TokenType, Value};
+use std::{convert, fmt, io};
 
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct Parser {
@@ -246,7 +238,7 @@ pub trait Visitor<R> {
     fn visit_literal_expr(&mut self, value: &Value) -> Result<R, Error>;
 }
 
-pub trait Interpreter<R: fmt::Display>: Visitor<R> {
+pub trait Interpreter<R>: Visitor<R> {
     fn interpret(&mut self, expr: &Expr) -> Result<R, Error>
     where
         Self: Sized,
@@ -260,7 +252,9 @@ pub trait Interpreter<R: fmt::Display>: Visitor<R> {
     {
         expression.accept(self)
     }
+}
 
+pub trait InterpreterErrors<R: fmt::Display> {
     fn runtime_error(&self, left: &R, operator: &Token, right: &R) -> Result<R, Error> {
         let message = match operator.r#type {
             TokenType::Op(Op::Minus)

@@ -3,7 +3,7 @@ use std::io::stdin;
 
 use mylang::asm_interpreter::Codegen;
 use mylang::ast_printer::AstPrinter;
-use mylang::bc_interpreter::BcInterpreter;
+use mylang::bc_interpreter::{BcCompiler, BcInterpreter};
 use mylang::interpreter::AstInterpreter;
 use mylang::parser::{Interpreter, Parse};
 use mylang::{lexer::Lexer, parser::Parser};
@@ -41,7 +41,7 @@ fn main() {
         s.pop();
         let mut lexer = Lexer::new(&s);
         let tokens = lexer.lex();
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens.clone());
         let expr = parser.parse();
         match mode {
             Mode::Ast => {
@@ -52,11 +52,12 @@ fn main() {
                 }
             }
             Mode::Bc => {
-                let res = BcInterpreter.interpret(&expr.unwrap());
-                match res {
-                    Ok(output) => println!("Output: {}", output),
-                    Err(e) => eprintln!("Error: {}", e),
-                }
+                let mut interpreter = BcInterpreter::default();
+                let _ = interpreter.interpret(&expr.unwrap());
+                let BcInterpreter { ops, stack } = interpreter;
+                let mut compiler = BcCompiler::new(ops, stack);
+                let res = compiler.compile();
+                println!("{}", res);
             }
             Mode::Repl => {
                 let res = AstInterpreter.interpret(&expr.unwrap());
