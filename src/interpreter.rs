@@ -15,19 +15,19 @@ impl Visitor<Value> for AstInterpreter {
     fn visit_binary_expr(
         &mut self,
         left: &Expr,
-        operator: &Token,
+        op: &Token,
         right: &Expr,
     ) -> Result<Value, Error> {
         let left = self.evaluate(left)?;
         let right = self.evaluate(right)?;
 
-        match (&left, &operator.r#type, &right) {
+        match (&left, &op.r#type, &right) {
             (Value::Number(left_num), TokenType::Op(Op::Minus), Value::Number(right_num)) => {
                 Ok(Value::Number(left_num - right_num))
             }
             (Value::Number(left_num), TokenType::Op(Op::Slash), Value::Number(0)) => {
                 Err(Error::Runtime {
-                    token: operator.clone(),
+                    token: op.clone(),
                     message: format!("Zero division error. Tried to divide {} by 0.", left_num),
                 })
             }
@@ -43,7 +43,7 @@ impl Visitor<Value> for AstInterpreter {
             (Value::String(left_str), TokenType::Op(Op::Plus), Value::String(right_str)) => {
                 Ok(Value::String(left_str.to_owned() + right_str))
             }
-            _ => self.runtime_error(&left, operator, &right),
+            _ => self.runtime_error(&left, op, &right),
         }
     }
 
@@ -53,5 +53,14 @@ impl Visitor<Value> for AstInterpreter {
 
     fn visit_grouping_expr(&mut self, expr: &Expr) -> Result<Value, Error> {
         self.evaluate(expr)
+    }
+
+    fn visit_unary_expr(&mut self, op: &Token, expr: &Expr) -> Result<Value, Error> {
+        let expr = self.evaluate(expr)?;
+        match (&op.r#type, &expr) {
+            (TokenType::Op(Op::Plus), Value::Number(num)) => Ok(Value::Number(*num)),
+            (TokenType::Op(Op::Minus), Value::Number(num)) => Ok(Value::Number(-num)),
+            _ => panic!("Unexpected op for expr: {} {}", &op, &expr),
+        }
     }
 }

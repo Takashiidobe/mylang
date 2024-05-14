@@ -57,8 +57,8 @@ fn main() {
             Mode::Bc => {
                 let mut interpreter = BcInterpreter::default();
                 let _ = interpreter.interpret(&expr.unwrap());
-                let BcInterpreter { ops, stack } = interpreter;
-                let mut compiler = BcCompiler::new(ops, stack);
+                let BcInterpreter { ops } = interpreter;
+                let mut compiler = BcCompiler::new(ops);
                 let res = compiler.compile();
                 println!("{}", res);
             }

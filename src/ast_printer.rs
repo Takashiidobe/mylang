@@ -29,10 +29,10 @@ impl Visitor<String> for AstPrinter {
     fn visit_binary_expr(
         &mut self,
         left: &Expr,
-        operator: &Token,
+        op: &Token,
         right: &Expr,
     ) -> Result<String, Error> {
-        self.parenthesize(operator.to_string(), &[left, right])
+        self.parenthesize(op.to_string(), &[left, right])
     }
 
     fn visit_grouping_expr(&mut self, expr: &Expr) -> Result<String, Error> {
@@ -41,6 +41,10 @@ impl Visitor<String> for AstPrinter {
 
     fn visit_literal_expr(&mut self, value: &Value) -> Result<String, Error> {
         Ok(value.to_string())
+    }
+
+    fn visit_unary_expr(&mut self, op: &Token, expr: &Expr) -> Result<String, Error> {
+        self.parenthesize(op.to_string(), &[expr])
     }
 }
 

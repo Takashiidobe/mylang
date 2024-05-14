@@ -16,6 +16,7 @@ pub trait Parse<P> {
     fn expression(&mut self) -> Result<P, Error>;
     fn term(&mut self) -> Result<P, Error>;
     fn factor(&mut self) -> Result<P, Error>;
+    fn unary(&mut self) -> Result<P, Error>;
     fn primary(&mut self) -> Result<P, Error>;
 }
 
@@ -45,11 +46,11 @@ impl Parse<Expr> for Parser {
     }
 
     fn factor(&mut self) -> Result<Expr, Error> {
-        let mut expr = self.primary()?;
+        let mut expr = self.unary()?;
 
         while self.r#match(&[TokenType::Op(Op::Slash), TokenType::Op(Op::Star)]) {
             let op = self.previous();
-            let right = self.primary()?;
+            let right = self.unary()?;
             expr = Expr::Binary {
                 left: Box::new(expr),
                 op,
@@ -58,6 +59,23 @@ impl Parse<Expr> for Parser {
         }
 
         Ok(expr)
+    }
+
+    fn unary(&mut self) -> Result<Expr, Error> {
+        if self.r#match(&[TokenType::Op(Op::Plus)]) {
+            self.previous();
+            return self.unary();
+        }
+
+        if self.r#match(&[TokenType::Op(Op::Minus)]) {
+            let op = self.previous();
+            return Ok(Expr::Unary {
+                op,
+                expr: Box::new(self.unary()?),
+            });
+        }
+
+        self.primary()
     }
 
     fn primary(&mut self) -> Result<Expr, Error> {
@@ -178,6 +196,7 @@ pub trait Visitor<R> {
     fn visit_binary_expr(&mut self, left: &Expr, op: &Token, right: &Expr) -> Result<R, Error>;
     fn visit_grouping_expr(&mut self, expr: &Expr) -> Result<R, Error>;
     fn visit_literal_expr(&mut self, value: &Value) -> Result<R, Error>;
+    fn visit_unary_expr(&mut self, op: &Token, expr: &Expr) -> Result<R, Error>;
 }
 
 pub trait Interpreter<R>: Visitor<R> {
@@ -197,8 +216,8 @@ pub trait Interpreter<R>: Visitor<R> {
 }
 
 pub trait InterpreterErrors<R: fmt::Display> {
-    fn runtime_error(&self, left: &R, operator: &Token, right: &R) -> Result<R, Error> {
-        let message = match operator.r#type {
+    fn runtime_error(&self, left: &R, op: &Token, right: &R) -> Result<R, Error> {
+        let message = match op.r#type {
             TokenType::Op(Op::Minus)
             | TokenType::Op(Op::Slash)
             | TokenType::Op(Op::Star)
@@ -206,26 +225,20 @@ pub trait InterpreterErrors<R: fmt::Display> {
             | TokenType::Op(Op::Ge)
             | TokenType::Op(Op::Lt)
             | TokenType::Op(Op::Le) => {
-                format!(
-                    "Operands must be numbers. Was: {} {} {}",
-                    left, operator, right
-                )
+                format!("Operands must be numbers. Was: {} {} {}", left, op, right)
             }
             TokenType::Op(Op::Plus) => {
                 format!(
                     "Operands must be two numbers or two strings. Was: {} {} {}",
-                    left, operator, right
+                    left, op, right
                 )
             }
             _ => {
-                format!(
-                    "Invalid expression error. Was: {} {} {}",
-                    left, operator, right
-                )
+                format!("Invalid expression error. Was: {} {} {}", left, op, right)
             }
         };
         Err(Error::Runtime {
-            token: operator.clone(),
+            token: op.clone(),
             message,
         })
     }

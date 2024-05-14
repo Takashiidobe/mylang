@@ -15,6 +15,10 @@ pub enum Expr {
         op: Token,
         right: Box<Expr>,
     },
+    Unary {
+        op: Token,
+        expr: Box<Expr>,
+    },
     Literal {
         value: Value,
     },
@@ -27,6 +31,7 @@ impl Expr {
     pub fn accept<R>(&self, visitor: &mut dyn Visitor<R>) -> Result<R, Error> {
         match self {
             Expr::Binary { left, op, right } => visitor.visit_binary_expr(left, op, right),
+            Expr::Unary { op, expr } => visitor.visit_unary_expr(op, expr),
             Expr::Literal { value } => visitor.visit_literal_expr(value),
             Expr::Grouping { expr } => visitor.visit_grouping_expr(expr),
         }

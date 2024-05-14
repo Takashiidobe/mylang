@@ -62,6 +62,7 @@ pub enum AsmInstruction {
     IDiv(Reg, Reg),
     Add(Reg, Reg),
     Sub(Reg, Reg),
+    Neg(Reg),
 }
 
 impl fmt::Display for AsmInstruction {
@@ -96,6 +97,7 @@ impl fmt::Display for AsmInstruction {
             AsmInstruction::Sub(left, right) => {
                 f.write_fmt(format_args!("  sub {}, {}", left, right))
             }
+            AsmInstruction::Neg(reg) => f.write_fmt(format_args!("  neg {}", reg)),
         }
     }
 }
@@ -206,6 +208,16 @@ impl Codegen {
             },
             Expr::Grouping { expr } => {
                 self.expr(expr);
+            }
+            Expr::Unary { op, expr } => {
+                if let Token {
+                    r#type: TokenType::Op(Op::Minus),
+                    ..
+                } = op
+                {
+                    self.expr(expr);
+                    self.add(AsmInstruction::Neg(Reg::Rax));
+                }
             }
         }
     }

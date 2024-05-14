@@ -1,20 +1,20 @@
-use crate::lexer::{Op, Value};
+use crate::{bc_interpreter::Opcode, lexer::Value};
 
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct BcCompiler {
-    pub ops: Vec<Op>,
+    pub ops: Vec<Opcode>,
     pub stack: Vec<Value>,
 }
 
 impl BcCompiler {
-    pub fn new(ops: Vec<Op>, stack: Vec<Value>) -> Self {
-        Self { ops, stack }
+    pub fn new(ops: Vec<Opcode>) -> Self {
+        Self { ops, stack: vec![] }
     }
 
     pub fn compile(&mut self) -> Value {
         for op in &self.ops {
             match op {
-                Op::Star => {
+                Opcode::Mul => {
                     let b = self.stack.pop().unwrap();
                     let a = self.stack.pop().unwrap();
 
@@ -25,7 +25,7 @@ impl BcCompiler {
                         _ => panic!("incorrect ops"),
                     }
                 }
-                Op::Slash => {
+                Opcode::Div => {
                     let b = self.stack.pop().unwrap();
                     let a = self.stack.pop().unwrap();
 
@@ -36,7 +36,7 @@ impl BcCompiler {
                         _ => panic!("incorrect ops"),
                     }
                 }
-                Op::Plus => {
+                Opcode::Plus => {
                     let b = self.stack.pop().unwrap();
                     let a = self.stack.pop().unwrap();
 
@@ -52,7 +52,7 @@ impl BcCompiler {
                         _ => panic!("incorrect ops"),
                     }
                 }
-                Op::Minus => {
+                Opcode::Sub => {
                     let b = self.stack.pop().unwrap();
                     let a = self.stack.pop().unwrap();
                     match (a, b) {
@@ -62,7 +62,18 @@ impl BcCompiler {
                         _ => panic!("incorrect ops"),
                     }
                 }
-                _ => todo!(),
+                Opcode::Negate => {
+                    let val = self.stack.pop().unwrap();
+                    match val {
+                        Value::Number(num) => {
+                            self.stack.push(Value::Number(-num));
+                        }
+                        _ => panic!("incorrect ops"),
+                    }
+                }
+                Opcode::Constant(value) => {
+                    self.stack.push(value.clone());
+                }
             }
         }
         self.stack.pop().unwrap()
