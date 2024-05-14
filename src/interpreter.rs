@@ -1,55 +1,14 @@
 use crate::{
     lexer::{Op, Token, TokenType, Value},
-    parser::{Error, Expr, Visitor},
+    parser::{Error, Expr, Interpreter, Visitor},
 };
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Interpreter;
+pub struct AstInterpreter;
 
-impl Interpreter {
-    pub fn interpret(&mut self, expr: &Expr) -> Result<Value, Error> {
-        self.evaluate(expr)
-    }
+impl Interpreter<Value> for AstInterpreter {}
 
-    fn evaluate(&mut self, expression: &Expr) -> Result<Value, Error> {
-        expression.accept(self)
-    }
-
-    fn runtime_error(&self, left: &Value, operator: &Token, right: &Value) -> Result<Value, Error> {
-        let message = match operator.r#type {
-            TokenType::Op(Op::Minus)
-            | TokenType::Op(Op::Slash)
-            | TokenType::Op(Op::Star)
-            | TokenType::Op(Op::Gt)
-            | TokenType::Op(Op::Ge)
-            | TokenType::Op(Op::Lt)
-            | TokenType::Op(Op::Le) => {
-                format!(
-                    "Operands must be numbers. Was: {} {} {}",
-                    left, operator, right
-                )
-            }
-            TokenType::Op(Op::Plus) => {
-                format!(
-                    "Operands must be two numbers or two strings. Was: {} {} {}",
-                    left, operator, right
-                )
-            }
-            _ => {
-                format!(
-                    "Invalid expression error. Was: {} {} {}",
-                    left, operator, right
-                )
-            }
-        };
-        Err(Error::Runtime {
-            token: operator.clone(),
-            message,
-        })
-    }
-}
-
-impl Visitor<Value> for Interpreter {
+impl Visitor<Value> for AstInterpreter {
     fn visit_binary_expr(
         &mut self,
         left: &Expr,
@@ -85,7 +44,7 @@ impl Visitor<Value> for Interpreter {
         }
     }
 
-    fn visit_literal_expr(&self, value: &Value) -> Result<Value, Error> {
+    fn visit_literal_expr(&mut self, value: &Value) -> Result<Value, Error> {
         Ok(value.clone())
     }
 

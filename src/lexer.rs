@@ -23,6 +23,27 @@ pub enum Op {
     Ge,
 }
 
+impl fmt::Display for Op {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Op::Star => "*",
+            Op::Slash => "/",
+            Op::Plus => "+",
+            Op::Minus => "-",
+            Op::And => "&&",
+            Op::Or => "||",
+            Op::Bang => "!",
+            Op::BangEqual => "!=",
+            Op::EqualEqual => "==",
+            Op::Equal => "=",
+            Op::Lt => "<",
+            Op::Le => "<=",
+            Op::Gt => ">",
+            Op::Ge => ">=",
+        })
+    }
+}
+
 #[cfg_attr(test, derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Punct {

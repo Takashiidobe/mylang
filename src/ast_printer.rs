@@ -37,7 +37,7 @@ impl Visitor<String> for AstPrinter {
         self.parenthesize("group".to_string(), &[expr])
     }
 
-    fn visit_literal_expr(&self, value: &Value) -> Result<String, Error> {
+    fn visit_literal_expr(&mut self, value: &Value) -> Result<String, Error> {
         Ok(value.to_string())
     }
 }

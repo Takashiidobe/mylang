@@ -26,11 +26,6 @@ pub trait Parse<P> {
     fn primary(&mut self) -> Result<P, Error>;
 }
 
-pub enum OpCode {
-    Constant(Value),
-    Op(Op),
-}
-
 impl Parse<Expr> for Parser {
     fn parse(&mut self) -> Result<Expr, Error> {
         self.expression()
@@ -248,7 +243,56 @@ pub enum Expr {
 pub trait Visitor<R> {
     fn visit_binary_expr(&mut self, left: &Expr, op: &Token, right: &Expr) -> Result<R, Error>;
     fn visit_grouping_expr(&mut self, expr: &Expr) -> Result<R, Error>;
-    fn visit_literal_expr(&self, value: &Value) -> Result<R, Error>;
+    fn visit_literal_expr(&mut self, value: &Value) -> Result<R, Error>;
+}
+
+pub trait Interpreter<R: fmt::Display>: Visitor<R> {
+    fn interpret(&mut self, expr: &Expr) -> Result<R, Error>
+    where
+        Self: Sized,
+    {
+        self.evaluate(expr)
+    }
+
+    fn evaluate(&mut self, expression: &Expr) -> Result<R, Error>
+    where
+        Self: Sized,
+    {
+        expression.accept(self)
+    }
+
+    fn runtime_error(&self, left: &R, operator: &Token, right: &R) -> Result<R, Error> {
+        let message = match operator.r#type {
+            TokenType::Op(Op::Minus)
+            | TokenType::Op(Op::Slash)
+            | TokenType::Op(Op::Star)
+            | TokenType::Op(Op::Gt)
+            | TokenType::Op(Op::Ge)
+            | TokenType::Op(Op::Lt)
+            | TokenType::Op(Op::Le) => {
+                format!(
+                    "Operands must be numbers. Was: {} {} {}",
+                    left, operator, right
+                )
+            }
+            TokenType::Op(Op::Plus) => {
+                format!(
+                    "Operands must be two numbers or two strings. Was: {} {} {}",
+                    left, operator, right
+                )
+            }
+            _ => {
+                format!(
+                    "Invalid expression error. Was: {} {} {}",
+                    left, operator, right
+                )
+            }
+        };
+        Err(Error::Runtime {
+            token: operator.clone(),
+            message,
+        })
+    }
 }
 
 impl Expr {
@@ -273,6 +317,7 @@ pub fn parser_error(token: &Token, message: &str) {
 mod tests {
     use super::*;
     use crate::lexer::Lexer;
+    use crate::parser::Parse;
     use insta::assert_yaml_snapshot;
 
     macro_rules! test_parser {
@@ -282,12 +327,13 @@ mod tests {
                 let mut scanner = Lexer::new($source);
                 let tokens = scanner.lex();
                 let mut parser = Parser::new(tokens);
-                assert_yaml_snapshot!(parser.parse().unwrap());
+                assert_yaml_snapshot!(Parse::<Expr>::parse(&mut parser).unwrap());
             }
         };
     }
 
     test_parser!(precedence_math, "15 - 3 * 4");
+    test_parser!(grouping, "(1 + 2) * 3");
     test_parser!(parse_true, "true");
     test_parser!(parse_false, "false");
     test_parser!(parse_nil, "nil");
