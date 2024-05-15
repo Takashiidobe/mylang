@@ -5,9 +5,11 @@ use crate::{
     lexer::{Op, Token, TokenType, Value},
 };
 
+#[derive(Default, Debug, Clone, PartialEq)]
 pub struct Codegen {
     depth: i64,
     instructions: Vec<AsmInstruction>,
+    label_count: u64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -30,7 +32,7 @@ impl fmt::Display for MoveSrc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             MoveSrc::Reg(reg) => f.write_fmt(format_args!("{}", reg)),
-            MoveSrc::Label(label) => f.write_fmt(format_args!("${}", label)),
+            MoveSrc::Label(label) => f.write_fmt(format_args!("$.{}", label)),
             MoveSrc::Number(num) => f.write_fmt(format_args!("${}", num)),
         }
     }
@@ -67,69 +69,61 @@ pub enum AsmInstruction {
     Setge(Reg),
     Cqo,
     Ret,
-    Cmp(Reg, Reg),
+    Test(Reg, Reg),
+    Cmp(MoveSrc, Reg),
     IMul(Reg, Reg),
     IDiv(Reg, Reg),
     Add(Reg, Reg),
     Sub(Reg, Reg),
     Neg(Reg),
+    Je(String),
+    Jne(String),
+    Jmp(String),
+    Jz(String),
 }
 
 impl fmt::Display for AsmInstruction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use AsmInstruction::*;
         match self {
-            AsmInstruction::Section(section) => f.write_fmt(format_args!(".{}", section)),
-            AsmInstruction::Variable(var, val) => match val {
+            Section(section) => f.write_fmt(format_args!(".{}", section)),
+            Variable(var, val) => match val {
                 Some(v) => f.write_fmt(format_args!("  .{} {}", var, v)),
                 None => f.write_fmt(format_args!("  .{}", var)),
             },
-            AsmInstruction::Label(label) => f.write_fmt(format_args!("{}:", label)),
-            AsmInstruction::Xor(left, right) => {
-                f.write_fmt(format_args!("  xor {}, {}", left, right))
-            }
-            AsmInstruction::Push(reg) => f.write_fmt(format_args!("  push {}", reg)),
-            AsmInstruction::Pop(reg) => f.write_fmt(format_args!("  pop {}", reg)),
-            AsmInstruction::Sete(reg) => f.write_fmt(format_args!("  sete {}", reg)),
-            AsmInstruction::Setne(reg) => f.write_fmt(format_args!("  setne {}", reg)),
-            AsmInstruction::Setl(reg) => f.write_fmt(format_args!("  setl {}", reg)),
-            AsmInstruction::Setle(reg) => f.write_fmt(format_args!("  setle {}", reg)),
-            AsmInstruction::Setg(reg) => f.write_fmt(format_args!("  setg {}", reg)),
-            AsmInstruction::Setge(reg) => f.write_fmt(format_args!("  setge {}", reg)),
-            AsmInstruction::Ret => f.write_fmt(format_args!("  ret")),
-            AsmInstruction::Call(fn_name) => f.write_fmt(format_args!("  call {}", fn_name)),
-            AsmInstruction::Cmp(left, right) => {
-                f.write_fmt(format_args!("  cmp {}, {}", left, right))
-            }
-            AsmInstruction::Mov(left, right) => {
-                f.write_fmt(format_args!("  mov {}, {}", left, right))
-            }
-            AsmInstruction::Movzb(left, right) => {
-                f.write_fmt(format_args!("  movzb {}, {}", left, right))
-            }
-            AsmInstruction::Cqo => f.write_fmt(format_args!("  cqo")),
-            AsmInstruction::IMul(left, right) => {
-                f.write_fmt(format_args!("  imul {}, {}", left, right))
-            }
-            AsmInstruction::IDiv(left, right) => {
-                f.write_fmt(format_args!("  idiv {}, {}", left, right))
-            }
-            AsmInstruction::Add(left, right) => {
-                f.write_fmt(format_args!("  add {}, {}", left, right))
-            }
-            AsmInstruction::Sub(left, right) => {
-                f.write_fmt(format_args!("  sub {}, {}", left, right))
-            }
-            AsmInstruction::Neg(reg) => f.write_fmt(format_args!("  neg {}", reg)),
+            Label(label) => f.write_fmt(format_args!("{}:", label)),
+            Xor(left, right) => f.write_fmt(format_args!("  xor {}, {}", left, right)),
+            Push(reg) => f.write_fmt(format_args!("  push {}", reg)),
+            Pop(reg) => f.write_fmt(format_args!("  pop {}", reg)),
+            Sete(reg) => f.write_fmt(format_args!("  sete {}", reg)),
+            Setne(reg) => f.write_fmt(format_args!("  setne {}", reg)),
+            Setl(reg) => f.write_fmt(format_args!("  setl {}", reg)),
+            Setle(reg) => f.write_fmt(format_args!("  setle {}", reg)),
+            Setg(reg) => f.write_fmt(format_args!("  setg {}", reg)),
+            Setge(reg) => f.write_fmt(format_args!("  setge {}", reg)),
+            Ret => f.write_fmt(format_args!("  ret")),
+            Call(fn_name) => f.write_fmt(format_args!("  call {}", fn_name)),
+            Test(left, right) => f.write_fmt(format_args!("  test {}, {}", left, right)),
+            Cmp(left, right) => f.write_fmt(format_args!("  cmp {}, {}", left, right)),
+            Mov(left, right) => f.write_fmt(format_args!("  mov {}, {}", left, right)),
+            Movzb(left, right) => f.write_fmt(format_args!("  movzb {}, {}", left, right)),
+            Cqo => f.write_fmt(format_args!("  cqo")),
+            IMul(left, right) => f.write_fmt(format_args!("  imul {}, {}", left, right)),
+            IDiv(left, right) => f.write_fmt(format_args!("  idiv {}, {}", left, right)),
+            Add(left, right) => f.write_fmt(format_args!("  add {}, {}", left, right)),
+            Sub(left, right) => f.write_fmt(format_args!("  sub {}, {}", left, right)),
+            Neg(reg) => f.write_fmt(format_args!("  neg {}", reg)),
+            Jne(reg) => f.write_fmt(format_args!("  jne {}", reg)),
+            Je(reg) => f.write_fmt(format_args!("  je {}", reg)),
+            Jz(reg) => f.write_fmt(format_args!("  jz {}", reg)),
+            Jmp(reg) => f.write_fmt(format_args!("  jmp {}", reg)),
         }
     }
 }
 
 impl Codegen {
     pub fn new() -> Self {
-        Self {
-            depth: 0,
-            instructions: vec![],
-        }
+        Self::default()
     }
 
     pub fn program(&mut self, expr: &Expr) -> Vec<AsmInstruction> {
@@ -141,7 +135,7 @@ impl Codegen {
 
     fn prologue(&mut self) {
         self.add(AsmInstruction::Variable("text".to_string(), None));
-        self.add(AsmInstruction::Label(".LC0".to_string()));
+        self.add(AsmInstruction::Label(".format".to_string()));
         self.add(AsmInstruction::Variable(
             "string".to_string(),
             Some("\"%d\\n\"".to_string()),
@@ -157,7 +151,7 @@ impl Codegen {
         self.add(AsmInstruction::Push(Reg::Rsp));
         self.add(AsmInstruction::Mov(MoveSrc::Reg(Reg::Rax), Reg::Rsi));
         self.add(AsmInstruction::Mov(
-            MoveSrc::Label(".LC0".to_string()),
+            MoveSrc::Label("format".to_string()),
             Reg::Rdi,
         ));
         self.add(AsmInstruction::Xor(Reg::Rax, Reg::Rax));
@@ -185,10 +179,7 @@ impl Codegen {
         match expr {
             Expr::Literal { value } => match value {
                 Value::Number(val) => {
-                    self.add(AsmInstruction::Mov(
-                        MoveSrc::Label(val.to_string()),
-                        Reg::Rax,
-                    ));
+                    self.add(AsmInstruction::Mov(MoveSrc::Number(*val), Reg::Rax));
                 }
                 _ => todo!(),
             },
@@ -231,7 +222,7 @@ impl Codegen {
                     ..
                 } => {
                     self.bin_op_fetch(left, right);
-                    self.add(AsmInstruction::Cmp(Reg::Rdi, Reg::Rax));
+                    self.add(AsmInstruction::Cmp(MoveSrc::Reg(Reg::Rdi), Reg::Rax));
                     self.add(AsmInstruction::Sete(Reg::Al));
                     self.add(AsmInstruction::Movzb(MoveSrc::Reg(Reg::Al), Reg::Rax));
                 }
@@ -240,7 +231,7 @@ impl Codegen {
                     ..
                 } => {
                     self.bin_op_fetch(left, right);
-                    self.add(AsmInstruction::Cmp(Reg::Rdi, Reg::Rax));
+                    self.add(AsmInstruction::Cmp(MoveSrc::Reg(Reg::Rdi), Reg::Rax));
                     self.add(AsmInstruction::Setne(Reg::Al));
                     self.add(AsmInstruction::Movzb(MoveSrc::Reg(Reg::Al), Reg::Rax));
                 }
@@ -249,7 +240,7 @@ impl Codegen {
                     ..
                 } => {
                     self.bin_op_fetch(left, right);
-                    self.add(AsmInstruction::Cmp(Reg::Rdi, Reg::Rax));
+                    self.add(AsmInstruction::Cmp(MoveSrc::Reg(Reg::Rdi), Reg::Rax));
                     self.add(AsmInstruction::Setl(Reg::Al));
                     self.add(AsmInstruction::Movzb(MoveSrc::Reg(Reg::Al), Reg::Rax));
                 }
@@ -258,7 +249,7 @@ impl Codegen {
                     ..
                 } => {
                     self.bin_op_fetch(left, right);
-                    self.add(AsmInstruction::Cmp(Reg::Rdi, Reg::Rax));
+                    self.add(AsmInstruction::Cmp(MoveSrc::Reg(Reg::Rdi), Reg::Rax));
                     self.add(AsmInstruction::Setle(Reg::Al));
                     self.add(AsmInstruction::Movzb(MoveSrc::Reg(Reg::Al), Reg::Rax));
                 }
@@ -267,7 +258,7 @@ impl Codegen {
                     ..
                 } => {
                     self.bin_op_fetch(left, right);
-                    self.add(AsmInstruction::Cmp(Reg::Rdi, Reg::Rax));
+                    self.add(AsmInstruction::Cmp(MoveSrc::Reg(Reg::Rdi), Reg::Rax));
                     self.add(AsmInstruction::Setg(Reg::Al));
                     self.add(AsmInstruction::Movzb(MoveSrc::Reg(Reg::Al), Reg::Rax));
                 }
@@ -276,7 +267,7 @@ impl Codegen {
                     ..
                 } => {
                     self.bin_op_fetch(left, right);
-                    self.add(AsmInstruction::Cmp(Reg::Rdi, Reg::Rax));
+                    self.add(AsmInstruction::Cmp(MoveSrc::Reg(Reg::Rdi), Reg::Rax));
                     self.add(AsmInstruction::Setge(Reg::Al));
                     self.add(AsmInstruction::Movzb(MoveSrc::Reg(Reg::Al), Reg::Rax));
                 }
@@ -295,7 +286,50 @@ impl Codegen {
                     self.add(AsmInstruction::Neg(Reg::Rax));
                 }
             }
+            Expr::Logical { left, op, right } => match op {
+                Token {
+                    r#type: TokenType::Op(Op::And),
+                    ..
+                } => {
+                    let count = self.get_count();
+                    self.expr(left);
+                    self.add(AsmInstruction::Cmp(MoveSrc::Number(0), Reg::Rax));
+                    self.add(AsmInstruction::Je(format!(".L.false.{}", count)));
+                    self.expr(right);
+                    self.add(AsmInstruction::Cmp(MoveSrc::Number(0), Reg::Rax));
+                    self.add(AsmInstruction::Je(format!(".L.false.{}", count)));
+                    self.add(AsmInstruction::Mov(MoveSrc::Number(1), Reg::Rax));
+                    self.add(AsmInstruction::Jmp(format!(".L.end.{}", count)));
+                    self.add(AsmInstruction::Label(format!(".L.false.{}", count)));
+                    self.add(AsmInstruction::Mov(MoveSrc::Number(0), Reg::Rax));
+                    self.add(AsmInstruction::Label(format!(".L.end.{}", count)));
+                }
+                Token {
+                    r#type: TokenType::Op(Op::Or),
+                    ..
+                } => {
+                    let count = self.get_count();
+                    self.expr(left);
+                    self.add(AsmInstruction::Cmp(MoveSrc::Number(0), Reg::Rax));
+                    self.add(AsmInstruction::Jne(format!(".L.true.{}", count)));
+                    self.expr(right);
+                    self.add(AsmInstruction::Cmp(MoveSrc::Number(0), Reg::Rax));
+                    self.add(AsmInstruction::Jne(format!(".L.true.{}", count)));
+                    self.add(AsmInstruction::Mov(MoveSrc::Number(0), Reg::Rax));
+                    self.add(AsmInstruction::Jmp(format!(".L.end.{}", count)));
+                    self.add(AsmInstruction::Label(format!(".L.true.{}", count)));
+                    self.add(AsmInstruction::Mov(MoveSrc::Number(1), Reg::Rax));
+                    self.add(AsmInstruction::Label(format!(".L.end.{}", count)));
+                }
+                _ => unreachable!(),
+            },
         }
+    }
+
+    fn get_count(&mut self) -> u64 {
+        let res = self.label_count;
+        self.label_count += 1;
+        res
     }
 
     fn bin_op_fetch(&mut self, left: &Expr, right: &Expr) {
@@ -303,11 +337,5 @@ impl Codegen {
         self.push();
         self.expr(left);
         self.pop(Reg::Rdi);
-    }
-}
-
-impl Default for Codegen {
-    fn default() -> Self {
-        Self::new()
     }
 }

@@ -15,6 +15,11 @@ pub enum Expr {
         op: Token,
         right: Box<Expr>,
     },
+    Logical {
+        left: Box<Expr>,
+        op: Token,
+        right: Box<Expr>,
+    },
     Unary {
         op: Token,
         expr: Box<Expr>,
@@ -34,6 +39,7 @@ impl Expr {
             Expr::Unary { op, expr } => visitor.visit_unary_expr(op, expr),
             Expr::Literal { value } => visitor.visit_literal_expr(value),
             Expr::Grouping { expr } => visitor.visit_grouping_expr(expr),
+            Expr::Logical { left, op, right } => visitor.visit_logical_expr(left, op, right),
         }
     }
 }

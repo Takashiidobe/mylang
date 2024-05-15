@@ -14,6 +14,8 @@ pub struct Parser {
 pub trait Parse<P> {
     fn parse(&mut self) -> Result<P, Error>;
     fn expression(&mut self) -> Result<P, Error>;
+    fn or(&mut self) -> Result<P, Error>;
+    fn and(&mut self) -> Result<P, Error>;
     fn equality(&mut self) -> Result<P, Error>;
     fn comparison(&mut self) -> Result<P, Error>;
     fn term(&mut self) -> Result<P, Error>;
@@ -28,7 +30,39 @@ impl Parse<Expr> for Parser {
     }
 
     fn expression(&mut self) -> Result<Expr, Error> {
-        self.equality()
+        self.or()
+    }
+
+    fn or(&mut self) -> Result<Expr, Error> {
+        let mut expr = self.and()?;
+
+        while self.r#match(&[TokenType::Op(Op::Or)]) {
+            let op = self.previous();
+            let right = Box::new(self.and()?);
+            expr = Expr::Logical {
+                left: Box::new(expr),
+                op,
+                right,
+            };
+        }
+
+        Ok(expr)
+    }
+
+    fn and(&mut self) -> Result<Expr, Error> {
+        let mut expr = self.equality()?;
+
+        while self.r#match(&[TokenType::Op(Op::And)]) {
+            let op = self.previous();
+            let right = Box::new(self.equality()?);
+            expr = Expr::Logical {
+                left: Box::new(expr),
+                op,
+                right,
+            };
+        }
+
+        Ok(expr)
     }
 
     fn equality(&mut self) -> Result<Expr, Error> {
@@ -236,6 +270,7 @@ pub trait Visitor<R> {
     fn visit_grouping_expr(&mut self, expr: &Expr) -> Result<R, Error>;
     fn visit_literal_expr(&mut self, value: &Value) -> Result<R, Error>;
     fn visit_unary_expr(&mut self, op: &Token, expr: &Expr) -> Result<R, Error>;
+    fn visit_logical_expr(&mut self, left: &Expr, op: &Token, right: &Expr) -> Result<R, Error>;
 }
 
 pub trait Interpreter<R>: Visitor<R> {

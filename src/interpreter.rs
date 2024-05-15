@@ -76,4 +76,52 @@ impl Visitor<Value> for AstInterpreter {
             _ => panic!("Unexpected op for expr: {} {}", &op, &expr),
         }
     }
+
+    fn visit_logical_expr(
+        &mut self,
+        left: &Expr,
+        op: &Token,
+        right: &Expr,
+    ) -> Result<Value, Error> {
+        match (left, &op.r#type, right) {
+            (
+                Expr::Literal {
+                    value: Value::Bool(l),
+                },
+                TokenType::Op(Op::And),
+                Expr::Literal {
+                    value: Value::Bool(r),
+                },
+            ) => Ok(Value::Bool(*l && *r)),
+            (
+                Expr::Literal {
+                    value: Value::Bool(l),
+                },
+                TokenType::Op(Op::Or),
+                Expr::Literal {
+                    value: Value::Bool(r),
+                },
+            ) => Ok(Value::Bool(*l || *r)),
+            (_, TokenType::Op(Op::And), _) => {
+                let l = self.evaluate(left)?;
+                let r = self.evaluate(right)?;
+                if l.is_truthy() && r.is_truthy() {
+                    Ok(r)
+                } else {
+                    Ok(l)
+                }
+            }
+            (_, TokenType::Op(Op::Or), _) => {
+                let l = self.evaluate(left)?;
+
+                if l.is_truthy() {
+                    Ok(l)
+                } else {
+                    let r = self.evaluate(right)?;
+                    Ok(r)
+                }
+            }
+            _ => panic!("unexpected logical op"),
+        }
+    }
 }

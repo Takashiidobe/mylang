@@ -60,7 +60,9 @@ fn main() {
                 let BcInterpreter { ops } = interpreter;
                 let mut compiler = BcCompiler::new(ops);
                 let res = compiler.compile();
-                println!("{}", res);
+                if let Some(val) = res {
+                    println!("{}", val);
+                }
             }
             Mode::Repl => {
                 let res = AstInterpreter.interpret(&expr.unwrap());

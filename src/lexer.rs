@@ -13,6 +13,8 @@ pub enum Op {
     Minus,
     And,
     Or,
+    BitAnd,
+    BitOr,
     Bang,
     BangEqual,
     EqualEqual,
@@ -32,6 +34,8 @@ impl fmt::Display for Op {
             Op::Minus => "-",
             Op::And => "&&",
             Op::Or => "||",
+            Op::BitAnd => "&",
+            Op::BitOr => "|",
             Op::Bang => "!",
             Op::BangEqual => "!=",
             Op::EqualEqual => "==",
@@ -103,6 +107,12 @@ pub enum Value {
     Nil,
 }
 
+impl Value {
+    pub fn is_truthy(&self) -> bool {
+        !matches!(&self, Value::Bool(false) | Value::Nil)
+    }
+}
+
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let val = match self {
@@ -136,6 +146,8 @@ impl fmt::Display for Token {
                 Op::Minus => "-",
                 Op::And => "&&",
                 Op::Or => "||",
+                Op::BitAnd => "&",
+                Op::BitOr => "|",
                 Op::Bang => "!",
                 Op::BangEqual => "!=",
                 Op::EqualEqual => "==",
@@ -215,7 +227,9 @@ impl Lexer {
                 '0'..='9' => tokens.push(self.number(c)),
                 'a'..='z' | 'A'..='Z' | '_' => tokens.push(self.identifier(c)),
                 '(' | ')' | '[' | ']' | '{' | '}' | ';' | ',' | '.' => tokens.push(self.punct(c)),
-                '!' | '=' | '<' | '>' | '*' | '+' | '/' | '-' => tokens.push(self.op(c)),
+                '!' | '=' | '<' | '>' | '*' | '+' | '/' | '-' | '&' | '|' => {
+                    tokens.push(self.op(c))
+                }
                 '\n' => {
                     self.line += 1;
                     self.col = 0;
@@ -333,6 +347,22 @@ impl Lexer {
                     (Op::EqualEqual, 2)
                 } else {
                     (Op::Equal, 1)
+                }
+            }
+            '&' => {
+                if let Some('&') = self.peek_next() {
+                    self.incr_one();
+                    (Op::And, 2)
+                } else {
+                    (Op::BitAnd, 1)
+                }
+            }
+            '|' => {
+                if let Some('|') = self.peek_next() {
+                    self.incr_one();
+                    (Op::Or, 2)
+                } else {
+                    (Op::BitOr, 1)
                 }
             }
             _ => unreachable!(),

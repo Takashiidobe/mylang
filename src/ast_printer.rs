@@ -46,6 +46,15 @@ impl Visitor<String> for AstPrinter {
     fn visit_unary_expr(&mut self, op: &Token, expr: &Expr) -> Result<String, Error> {
         self.parenthesize(op.to_string(), &[expr])
     }
+
+    fn visit_logical_expr(
+        &mut self,
+        left: &Expr,
+        op: &Token,
+        right: &Expr,
+    ) -> Result<String, Error> {
+        self.parenthesize(op.to_string(), &[left, right])
+    }
 }
 
 #[cfg(test)]

@@ -11,12 +11,12 @@ impl BcCompiler {
         Self { ops, stack: vec![] }
     }
 
-    pub fn compile(&mut self) -> Value {
+    pub fn compile(&mut self) -> Option<Value> {
         for op in &self.ops {
             match op {
                 Opcode::Mul => {
-                    let b = self.stack.pop().unwrap();
-                    let a = self.stack.pop().unwrap();
+                    let b = self.stack.pop()?;
+                    let a = self.stack.pop()?;
 
                     match (a, b) {
                         (Value::Number(l), Value::Number(r)) => {
@@ -26,8 +26,8 @@ impl BcCompiler {
                     }
                 }
                 Opcode::Div => {
-                    let b = self.stack.pop().unwrap();
-                    let a = self.stack.pop().unwrap();
+                    let b = self.stack.pop()?;
+                    let a = self.stack.pop()?;
 
                     match (a, b) {
                         (Value::Number(l), Value::Number(r)) => {
@@ -37,8 +37,8 @@ impl BcCompiler {
                     }
                 }
                 Opcode::Plus => {
-                    let b = self.stack.pop().unwrap();
-                    let a = self.stack.pop().unwrap();
+                    let b = self.stack.pop()?;
+                    let a = self.stack.pop()?;
 
                     match (a, b) {
                         (Value::Number(l), Value::Number(r)) => {
@@ -53,8 +53,8 @@ impl BcCompiler {
                     }
                 }
                 Opcode::Sub => {
-                    let b = self.stack.pop().unwrap();
-                    let a = self.stack.pop().unwrap();
+                    let b = self.stack.pop()?;
+                    let a = self.stack.pop()?;
                     match (a, b) {
                         (Value::Number(l), Value::Number(r)) => {
                             self.stack.push(Value::Number(l - r));
@@ -63,7 +63,7 @@ impl BcCompiler {
                     }
                 }
                 Opcode::Negate => {
-                    let val = self.stack.pop().unwrap();
+                    let val = self.stack.pop()?;
                     match val {
                         Value::Number(num) => {
                             self.stack.push(Value::Number(-num));
@@ -75,8 +75,8 @@ impl BcCompiler {
                     self.stack.push(value.clone());
                 }
                 Opcode::Gt => {
-                    let b = self.stack.pop().unwrap();
-                    let a = self.stack.pop().unwrap();
+                    let b = self.stack.pop()?;
+                    let a = self.stack.pop()?;
                     match (a, b) {
                         (Value::Number(l), Value::Number(r)) => {
                             self.stack.push(Value::Bool(l > r));
@@ -85,8 +85,8 @@ impl BcCompiler {
                     }
                 }
                 Opcode::Ge => {
-                    let b = self.stack.pop().unwrap();
-                    let a = self.stack.pop().unwrap();
+                    let b = self.stack.pop()?;
+                    let a = self.stack.pop()?;
                     match (a, b) {
                         (Value::Number(l), Value::Number(r)) => {
                             self.stack.push(Value::Bool(l >= r));
@@ -95,8 +95,8 @@ impl BcCompiler {
                     }
                 }
                 Opcode::Lt => {
-                    let b = self.stack.pop().unwrap();
-                    let a = self.stack.pop().unwrap();
+                    let b = self.stack.pop()?;
+                    let a = self.stack.pop()?;
                     match (a, b) {
                         (Value::Number(l), Value::Number(r)) => {
                             self.stack.push(Value::Bool(l < r));
@@ -105,8 +105,8 @@ impl BcCompiler {
                     }
                 }
                 Opcode::Le => {
-                    let b = self.stack.pop().unwrap();
-                    let a = self.stack.pop().unwrap();
+                    let b = self.stack.pop()?;
+                    let a = self.stack.pop()?;
                     match (a, b) {
                         (Value::Number(l), Value::Number(r)) => {
                             self.stack.push(Value::Bool(l <= r));
@@ -115,8 +115,8 @@ impl BcCompiler {
                     }
                 }
                 Opcode::Ne => {
-                    let b = self.stack.pop().unwrap();
-                    let a = self.stack.pop().unwrap();
+                    let b = self.stack.pop()?;
+                    let a = self.stack.pop()?;
                     match (a, b) {
                         (Value::Number(l), Value::Number(r)) => {
                             self.stack.push(Value::Bool(l != r));
@@ -131,8 +131,8 @@ impl BcCompiler {
                     }
                 }
                 Opcode::EqEq => {
-                    let b = self.stack.pop().unwrap();
-                    let a = self.stack.pop().unwrap();
+                    let b = self.stack.pop()?;
+                    let a = self.stack.pop()?;
                     match (a, b) {
                         (Value::Number(l), Value::Number(r)) => {
                             self.stack.push(Value::Bool(l == r));
@@ -146,8 +146,40 @@ impl BcCompiler {
                         _ => panic!("incorrect ops"),
                     }
                 }
+                Opcode::And => {
+                    let b = self.stack.pop()?;
+                    let a = self.stack.pop()?;
+                    match (a, b) {
+                        (Value::Bool(l), Value::Bool(r)) => {
+                            self.stack.push(Value::Bool(l && r));
+                        }
+                        (l, r) => {
+                            if l.is_truthy() && r.is_truthy() {
+                                self.stack.push(l);
+                            } else {
+                                self.stack.push(r);
+                            }
+                        }
+                    }
+                }
+                Opcode::Or => {
+                    let b = self.stack.pop()?;
+                    let a = self.stack.pop()?;
+                    match (a, b) {
+                        (Value::Bool(l), Value::Bool(r)) => {
+                            self.stack.push(Value::Bool(l || r));
+                        }
+                        (l, r) => {
+                            if l.is_truthy() {
+                                self.stack.push(l);
+                            } else {
+                                self.stack.push(r);
+                            }
+                        }
+                    }
+                }
             }
         }
-        self.stack.pop().unwrap()
+        self.stack.pop()
     }
 }

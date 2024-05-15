@@ -19,6 +19,8 @@ pub enum Opcode {
     Le,
     Ne,
     EqEq,
+    And,
+    Or,
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -98,5 +100,23 @@ impl Visitor<()> for BcInterpreter {
             _ => panic!("Invalid unary expr: {} {:?}", op, expr),
         }
         Ok(())
+    }
+
+    fn visit_logical_expr(&mut self, left: &Expr, op: &Token, right: &Expr) -> Result<(), Error> {
+        match &op.r#type {
+            TokenType::Op(Op::And) => {
+                self.evaluate(left)?;
+                self.evaluate(right)?;
+                self.ops.push(Opcode::And);
+                Ok(())
+            }
+            TokenType::Op(Op::Or) => {
+                self.evaluate(left)?;
+                self.evaluate(right)?;
+                self.ops.push(Opcode::Or);
+                Ok(())
+            }
+            _ => panic!("Invalid logical expr: {:?} {} {:?}", left, op, right),
+        }
     }
 }
