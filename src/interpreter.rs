@@ -50,12 +50,8 @@ impl Visitor<Value> for AstInterpreter {
             (Value::Number(left_num), TokenType::Op(Op::Ge), Value::Number(right_num)) => {
                 Ok(Value::Bool(left_num >= right_num))
             }
-            (Value::Number(left_num), TokenType::Op(Op::BangEqual), Value::Number(right_num)) => {
-                Ok(Value::Bool(left_num != right_num))
-            }
-            (Value::Number(left_num), TokenType::Op(Op::EqualEqual), Value::Number(right_num)) => {
-                Ok(Value::Bool(left_num == right_num))
-            }
+            (_, TokenType::Op(Op::BangEqual), _) => Ok(Value::Bool(left != right)),
+            (_, TokenType::Op(Op::EqualEqual), _) => Ok(Value::Bool(left != right)),
             _ => self.runtime_error(&left, op, &right),
         }
     }
