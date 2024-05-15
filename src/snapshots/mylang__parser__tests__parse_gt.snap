@@ -1,0 +1,21 @@
+---
+source: src/parser.rs
+expression: "Parse::<Expr>::parse(&mut parser).unwrap()"
+---
+Binary:
+  left:
+    Literal:
+      value:
+        Number: 1
+  op:
+    type:
+      Op: Gt
+    loc:
+      line: 1
+      col: 2
+    len: 1
+    value: ~
+  right:
+    Literal:
+      value:
+        Number: 2

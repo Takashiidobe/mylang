@@ -16,6 +16,7 @@ pub enum Reg {
     Rsp,
     Rsi,
     Rdi,
+    Al,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -42,6 +43,7 @@ impl fmt::Display for Reg {
             Reg::Rsp => "%rsp",
             Reg::Rsi => "%rsi",
             Reg::Rdi => "%rdi",
+            Reg::Al => "%al",
         })
     }
 }
@@ -56,8 +58,16 @@ pub enum AsmInstruction {
     Pop(Reg),
     Call(String),
     Mov(MoveSrc, Reg),
+    Movzb(MoveSrc, Reg),
+    Sete(Reg),
+    Setne(Reg),
+    Setl(Reg),
+    Setle(Reg),
+    Setg(Reg),
+    Setge(Reg),
     Cqo,
     Ret,
+    Cmp(Reg, Reg),
     IMul(Reg, Reg),
     IDiv(Reg, Reg),
     Add(Reg, Reg),
@@ -79,10 +89,22 @@ impl fmt::Display for AsmInstruction {
             }
             AsmInstruction::Push(reg) => f.write_fmt(format_args!("  push {}", reg)),
             AsmInstruction::Pop(reg) => f.write_fmt(format_args!("  pop {}", reg)),
+            AsmInstruction::Sete(reg) => f.write_fmt(format_args!("  sete {}", reg)),
+            AsmInstruction::Setne(reg) => f.write_fmt(format_args!("  setne {}", reg)),
+            AsmInstruction::Setl(reg) => f.write_fmt(format_args!("  setl {}", reg)),
+            AsmInstruction::Setle(reg) => f.write_fmt(format_args!("  setle {}", reg)),
+            AsmInstruction::Setg(reg) => f.write_fmt(format_args!("  setg {}", reg)),
+            AsmInstruction::Setge(reg) => f.write_fmt(format_args!("  setge {}", reg)),
             AsmInstruction::Ret => f.write_fmt(format_args!("  ret")),
             AsmInstruction::Call(fn_name) => f.write_fmt(format_args!("  call {}", fn_name)),
+            AsmInstruction::Cmp(left, right) => {
+                f.write_fmt(format_args!("  cmp {}, {}", left, right))
+            }
             AsmInstruction::Mov(left, right) => {
                 f.write_fmt(format_args!("  mov {}, {}", left, right))
+            }
+            AsmInstruction::Movzb(left, right) => {
+                f.write_fmt(format_args!("  movzb {}, {}", left, right))
             }
             AsmInstruction::Cqo => f.write_fmt(format_args!("  cqo")),
             AsmInstruction::IMul(left, right) => {
@@ -203,6 +225,60 @@ impl Codegen {
                 } => {
                     self.bin_op_fetch(left, right);
                     self.add(AsmInstruction::IMul(Reg::Rdi, Reg::Rax));
+                }
+                Token {
+                    r#type: TokenType::Op(Op::EqualEqual),
+                    ..
+                } => {
+                    self.bin_op_fetch(left, right);
+                    self.add(AsmInstruction::Cmp(Reg::Rdi, Reg::Rax));
+                    self.add(AsmInstruction::Sete(Reg::Al));
+                    self.add(AsmInstruction::Movzb(MoveSrc::Reg(Reg::Al), Reg::Rax));
+                }
+                Token {
+                    r#type: TokenType::Op(Op::BangEqual),
+                    ..
+                } => {
+                    self.bin_op_fetch(left, right);
+                    self.add(AsmInstruction::Cmp(Reg::Rdi, Reg::Rax));
+                    self.add(AsmInstruction::Setne(Reg::Al));
+                    self.add(AsmInstruction::Movzb(MoveSrc::Reg(Reg::Al), Reg::Rax));
+                }
+                Token {
+                    r#type: TokenType::Op(Op::Lt),
+                    ..
+                } => {
+                    self.bin_op_fetch(left, right);
+                    self.add(AsmInstruction::Cmp(Reg::Rdi, Reg::Rax));
+                    self.add(AsmInstruction::Setl(Reg::Al));
+                    self.add(AsmInstruction::Movzb(MoveSrc::Reg(Reg::Al), Reg::Rax));
+                }
+                Token {
+                    r#type: TokenType::Op(Op::Le),
+                    ..
+                } => {
+                    self.bin_op_fetch(left, right);
+                    self.add(AsmInstruction::Cmp(Reg::Rdi, Reg::Rax));
+                    self.add(AsmInstruction::Setle(Reg::Al));
+                    self.add(AsmInstruction::Movzb(MoveSrc::Reg(Reg::Al), Reg::Rax));
+                }
+                Token {
+                    r#type: TokenType::Op(Op::Gt),
+                    ..
+                } => {
+                    self.bin_op_fetch(left, right);
+                    self.add(AsmInstruction::Cmp(Reg::Rdi, Reg::Rax));
+                    self.add(AsmInstruction::Setg(Reg::Al));
+                    self.add(AsmInstruction::Movzb(MoveSrc::Reg(Reg::Al), Reg::Rax));
+                }
+                Token {
+                    r#type: TokenType::Op(Op::Ge),
+                    ..
+                } => {
+                    self.bin_op_fetch(left, right);
+                    self.add(AsmInstruction::Cmp(Reg::Rdi, Reg::Rax));
+                    self.add(AsmInstruction::Setge(Reg::Al));
+                    self.add(AsmInstruction::Movzb(MoveSrc::Reg(Reg::Al), Reg::Rax));
                 }
                 _ => todo!(),
             },

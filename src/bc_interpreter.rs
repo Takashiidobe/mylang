@@ -13,6 +13,12 @@ pub enum Opcode {
     Sub,
     Mul,
     Div,
+    Gt,
+    Ge,
+    Lt,
+    Le,
+    Ne,
+    EqEq,
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -44,6 +50,30 @@ impl Visitor<()> for BcInterpreter {
             }
             TokenType::Op(Op::Slash) => {
                 self.ops.push(Opcode::Div);
+                Ok(())
+            }
+            TokenType::Op(Op::Gt) => {
+                self.ops.push(Opcode::Gt);
+                Ok(())
+            }
+            TokenType::Op(Op::Ge) => {
+                self.ops.push(Opcode::Ge);
+                Ok(())
+            }
+            TokenType::Op(Op::Lt) => {
+                self.ops.push(Opcode::Lt);
+                Ok(())
+            }
+            TokenType::Op(Op::Le) => {
+                self.ops.push(Opcode::Le);
+                Ok(())
+            }
+            TokenType::Op(Op::BangEqual) => {
+                self.ops.push(Opcode::Ne);
+                Ok(())
+            }
+            TokenType::Op(Op::EqualEqual) => {
+                self.ops.push(Opcode::EqEq);
                 Ok(())
             }
             _ => panic!("Invalid binary expr: {:?} {} {:?}", left, op, right),

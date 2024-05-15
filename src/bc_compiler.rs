@@ -74,6 +74,78 @@ impl BcCompiler {
                 Opcode::Constant(value) => {
                     self.stack.push(value.clone());
                 }
+                Opcode::Gt => {
+                    let b = self.stack.pop().unwrap();
+                    let a = self.stack.pop().unwrap();
+                    match (a, b) {
+                        (Value::Number(l), Value::Number(r)) => {
+                            self.stack.push(Value::Bool(l > r));
+                        }
+                        _ => panic!("incorrect ops"),
+                    }
+                }
+                Opcode::Ge => {
+                    let b = self.stack.pop().unwrap();
+                    let a = self.stack.pop().unwrap();
+                    match (a, b) {
+                        (Value::Number(l), Value::Number(r)) => {
+                            self.stack.push(Value::Bool(l >= r));
+                        }
+                        _ => panic!("incorrect ops"),
+                    }
+                }
+                Opcode::Lt => {
+                    let b = self.stack.pop().unwrap();
+                    let a = self.stack.pop().unwrap();
+                    match (a, b) {
+                        (Value::Number(l), Value::Number(r)) => {
+                            self.stack.push(Value::Bool(l < r));
+                        }
+                        _ => panic!("incorrect ops"),
+                    }
+                }
+                Opcode::Le => {
+                    let b = self.stack.pop().unwrap();
+                    let a = self.stack.pop().unwrap();
+                    match (a, b) {
+                        (Value::Number(l), Value::Number(r)) => {
+                            self.stack.push(Value::Bool(l <= r));
+                        }
+                        _ => panic!("incorrect ops"),
+                    }
+                }
+                Opcode::Ne => {
+                    let b = self.stack.pop().unwrap();
+                    let a = self.stack.pop().unwrap();
+                    match (a, b) {
+                        (Value::Number(l), Value::Number(r)) => {
+                            self.stack.push(Value::Bool(l != r));
+                        }
+                        (Value::String(l), Value::String(r)) => {
+                            self.stack.push(Value::Bool(l != r));
+                        }
+                        (Value::Bool(l), Value::Bool(r)) => {
+                            self.stack.push(Value::Bool(l != r));
+                        }
+                        _ => panic!("incorrect ops"),
+                    }
+                }
+                Opcode::EqEq => {
+                    let b = self.stack.pop().unwrap();
+                    let a = self.stack.pop().unwrap();
+                    match (a, b) {
+                        (Value::Number(l), Value::Number(r)) => {
+                            self.stack.push(Value::Bool(l == r));
+                        }
+                        (Value::String(l), Value::String(r)) => {
+                            self.stack.push(Value::Bool(l == r));
+                        }
+                        (Value::Bool(l), Value::Bool(r)) => {
+                            self.stack.push(Value::Bool(l == r));
+                        }
+                        _ => panic!("incorrect ops"),
+                    }
+                }
             }
         }
         self.stack.pop().unwrap()

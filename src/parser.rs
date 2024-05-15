@@ -14,6 +14,8 @@ pub struct Parser {
 pub trait Parse<P> {
     fn parse(&mut self) -> Result<P, Error>;
     fn expression(&mut self) -> Result<P, Error>;
+    fn equality(&mut self) -> Result<P, Error>;
+    fn comparison(&mut self) -> Result<P, Error>;
     fn term(&mut self) -> Result<P, Error>;
     fn factor(&mut self) -> Result<P, Error>;
     fn unary(&mut self) -> Result<P, Error>;
@@ -26,7 +28,44 @@ impl Parse<Expr> for Parser {
     }
 
     fn expression(&mut self) -> Result<Expr, Error> {
-        self.term()
+        self.equality()
+    }
+
+    fn equality(&mut self) -> Result<Expr, Error> {
+        let mut expr = self.comparison()?;
+
+        while self.r#match(&[TokenType::Op(Op::BangEqual), TokenType::Op(Op::EqualEqual)]) {
+            let op = self.previous();
+            let right = self.comparison()?;
+            expr = Expr::Binary {
+                left: Box::new(expr),
+                op,
+                right: Box::new(right),
+            }
+        }
+
+        Ok(expr)
+    }
+
+    fn comparison(&mut self) -> Result<Expr, Error> {
+        let mut expr = self.term()?;
+
+        while self.r#match(&[
+            TokenType::Op(Op::Gt),
+            TokenType::Op(Op::Ge),
+            TokenType::Op(Op::Lt),
+            TokenType::Op(Op::Le),
+        ]) {
+            let op = self.previous();
+            let right = self.term()?;
+            expr = Expr::Binary {
+                left: Box::new(expr),
+                op,
+                right: Box::new(right),
+            }
+        }
+
+        Ok(expr)
     }
 
     fn term(&mut self) -> Result<Expr, Error> {
@@ -277,4 +316,10 @@ mod tests {
     test_parser!(parse_true, "true");
     test_parser!(parse_false, "false");
     test_parser!(parse_nil, "nil");
+    test_parser!(parse_bang_equal, "1 != 2");
+    test_parser!(parse_equal_equal, "1 == 2");
+    test_parser!(parse_gt, "1 > 2");
+    test_parser!(parse_ge, "1 >= 2");
+    test_parser!(parse_lt, "1 < 2");
+    test_parser!(parse_le, "1 <= 2");
 }

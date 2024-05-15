@@ -12,12 +12,7 @@ impl Interpreter<Value> for AstInterpreter {}
 impl InterpreterErrors<Value> for AstInterpreter {}
 
 impl Visitor<Value> for AstInterpreter {
-    fn visit_binary_expr(
-        &mut self,
-        left: &Expr,
-        op: &Token,
-        right: &Expr,
-    ) -> Result<Value, Error> {
+    fn visit_binary_expr(&mut self, left: &Expr, op: &Token, right: &Expr) -> Result<Value, Error> {
         let left = self.evaluate(left)?;
         let right = self.evaluate(right)?;
 
@@ -42,6 +37,24 @@ impl Visitor<Value> for AstInterpreter {
             }
             (Value::String(left_str), TokenType::Op(Op::Plus), Value::String(right_str)) => {
                 Ok(Value::String(left_str.to_owned() + right_str))
+            }
+            (Value::Number(left_num), TokenType::Op(Op::Lt), Value::Number(right_num)) => {
+                Ok(Value::Bool(left_num < right_num))
+            }
+            (Value::Number(left_num), TokenType::Op(Op::Le), Value::Number(right_num)) => {
+                Ok(Value::Bool(left_num <= right_num))
+            }
+            (Value::Number(left_num), TokenType::Op(Op::Gt), Value::Number(right_num)) => {
+                Ok(Value::Bool(left_num > right_num))
+            }
+            (Value::Number(left_num), TokenType::Op(Op::Ge), Value::Number(right_num)) => {
+                Ok(Value::Bool(left_num >= right_num))
+            }
+            (Value::Number(left_num), TokenType::Op(Op::BangEqual), Value::Number(right_num)) => {
+                Ok(Value::Bool(left_num != right_num))
+            }
+            (Value::Number(left_num), TokenType::Op(Op::EqualEqual), Value::Number(right_num)) => {
+                Ok(Value::Bool(left_num == right_num))
             }
             _ => self.runtime_error(&left, op, &right),
         }
