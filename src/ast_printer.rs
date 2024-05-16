@@ -1,15 +1,39 @@
 use crate::{
     error::Error,
-    expr::Expr,
+    expr::{Expr, ExprVisitor},
     lexer::{Token, Value},
-    parser::Visitor,
+    parser::{Evaluate, Interpreter},
+    stmt::{Stmt, StmtVisitor},
 };
+
+impl Interpreter<String> for AstPrinter {
+    fn interpret(&mut self, stmts: &[Stmt]) -> Result<String, Error> {
+        let mut s = String::default();
+        for stmt in stmts {
+            s.push_str(&self.eval_stmt(stmt)?);
+            s.push('\n');
+        }
+        Ok(s)
+    }
+}
+
+impl Evaluate<String> for AstPrinter {}
 
 pub struct AstPrinter;
 
 impl AstPrinter {
-    pub fn print(&mut self, expr: &Expr) -> Result<String, Error> {
-        expr.accept(self)
+    pub fn print(&mut self, stmts: &[Stmt]) -> Result<String, Error> {
+        let mut s = String::new();
+        for stmt in stmts {
+            match stmt {
+                Stmt::Expr { .. } => {
+                    s.push_str(&stmt.accept(self)?);
+                    s.push('\n');
+                }
+            }
+        }
+        s.pop();
+        Ok(s)
     }
 
     fn parenthesize(&mut self, name: String, exprs: &[&Expr]) -> Result<String, Error> {
@@ -25,7 +49,13 @@ impl AstPrinter {
     }
 }
 
-impl Visitor<String> for AstPrinter {
+impl StmtVisitor<String> for AstPrinter {
+    fn visit_expr_stmt(&mut self, expr: &Expr) -> Result<String, Error> {
+        expr.accept(self)
+    }
+}
+
+impl ExprVisitor<String> for AstPrinter {
     fn visit_binary_expr(
         &mut self,
         left: &Expr,
@@ -54,6 +84,10 @@ impl Visitor<String> for AstPrinter {
         right: &Expr,
     ) -> Result<String, Error> {
         self.parenthesize(op.to_string(), &[left, right])
+    }
+
+    fn visit_statement_expr(&mut self, expr: &Expr) -> Result<String, Error> {
+        expr.accept(self)
     }
 }
 

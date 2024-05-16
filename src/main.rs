@@ -1,4 +1,5 @@
 use std::env::args;
+use std::error::Error;
 use std::io::{stdin, stdout, Write};
 
 use mylang::asm_interpreter::Codegen;
@@ -18,7 +19,7 @@ enum Mode {
     Repl,
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<_> = args().collect();
     let mut mode = Mode::default();
     if args.len() > 1 {
@@ -40,15 +41,15 @@ fn main() {
     loop {
         print!("> ");
         let _ = stdout().flush();
-        stdin().read_line(&mut s).unwrap();
+        stdin().read_line(&mut s)?;
         s.pop();
         let mut lexer = Lexer::new(&s);
         let tokens = lexer.lex();
         let mut parser = Parser::new(tokens.clone());
-        let expr = parser.parse();
+        let stmts = parser.parse();
         match mode {
             Mode::Ast => {
-                let res = AstPrinter.print(&expr.unwrap());
+                let res = AstPrinter.print(&stmts?);
                 match res {
                     Ok(output) => println!("Output: {}", output),
                     Err(e) => eprintln!("Error: {}", e),
@@ -56,7 +57,7 @@ fn main() {
             }
             Mode::Bc => {
                 let mut interpreter = BcInterpreter::default();
-                let _ = interpreter.interpret(&expr.unwrap());
+                let _ = interpreter.interpret(&stmts?);
                 let BcInterpreter { ops } = interpreter;
                 let mut compiler = BcCompiler::new(ops);
                 let res = compiler.compile();
@@ -65,15 +66,17 @@ fn main() {
                 }
             }
             Mode::Repl => {
-                let res = AstInterpreter.interpret(&expr.unwrap());
+                let res = AstInterpreter.interpret(&stmts?);
                 match res {
-                    Ok(output) => println!("Output: {}", output),
+                    Ok(output) => {
+                        println!("Output: {}", output);
+                    }
                     Err(e) => eprintln!("Error: {}", e),
                 }
             }
             Mode::Asm => {
                 let mut codegen = Codegen::new();
-                let instructions = codegen.program(&expr.unwrap());
+                let instructions = codegen.program(&stmts?);
                 for instruction in instructions {
                     println!("{}", instruction);
                 }

@@ -1,20 +1,36 @@
 use crate::{
     error::Error,
-    expr::Expr,
+    expr::{Expr, ExprVisitor},
     lexer::{Op, Token, TokenType, Value},
-    parser::{Interpreter, InterpreterErrors, Visitor},
+    parser::{Evaluate, Interpreter, InterpreterErrors},
+    stmt::{Stmt, StmtVisitor},
 };
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AstInterpreter;
 
-impl Interpreter<Value> for AstInterpreter {}
+impl Interpreter<Value> for AstInterpreter {
+    fn interpret(&mut self, stmts: &[Stmt]) -> Result<Value, Error> {
+        let mut values = vec![];
+        for stmt in stmts {
+            values.push(self.eval_stmt(stmt)?);
+        }
+        Ok(values.pop().unwrap())
+    }
+}
+impl Evaluate<Value> for AstInterpreter {}
 impl InterpreterErrors<Value> for AstInterpreter {}
 
-impl Visitor<Value> for AstInterpreter {
+impl StmtVisitor<Value> for AstInterpreter {
+    fn visit_expr_stmt(&mut self, expr: &Expr) -> Result<Value, Error> {
+        self.visit_statement_expr(expr)
+    }
+}
+
+impl ExprVisitor<Value> for AstInterpreter {
     fn visit_binary_expr(&mut self, left: &Expr, op: &Token, right: &Expr) -> Result<Value, Error> {
-        let left = self.evaluate(left)?;
-        let right = self.evaluate(right)?;
+        let left = self.eval_expr(left)?;
+        let right = self.eval_expr(right)?;
 
         match (&left, &op.r#type, &right) {
             (Value::Number(left_num), TokenType::Op(Op::Minus), Value::Number(right_num)) => {
@@ -61,11 +77,11 @@ impl Visitor<Value> for AstInterpreter {
     }
 
     fn visit_grouping_expr(&mut self, expr: &Expr) -> Result<Value, Error> {
-        self.evaluate(expr)
+        self.eval_expr(expr)
     }
 
     fn visit_unary_expr(&mut self, op: &Token, expr: &Expr) -> Result<Value, Error> {
-        let expr = self.evaluate(expr)?;
+        let expr = self.eval_expr(expr)?;
         match (&op.r#type, &expr) {
             (TokenType::Op(Op::Plus), Value::Number(num)) => Ok(Value::Number(*num)),
             (TokenType::Op(Op::Minus), Value::Number(num)) => Ok(Value::Number(-num)),
@@ -99,8 +115,8 @@ impl Visitor<Value> for AstInterpreter {
                 },
             ) => Ok(Value::Bool(*l || *r)),
             (_, TokenType::Op(Op::And), _) => {
-                let l = self.evaluate(left)?;
-                let r = self.evaluate(right)?;
+                let l = self.eval_expr(left)?;
+                let r = self.eval_expr(right)?;
                 if l.is_truthy() && r.is_truthy() {
                     Ok(r)
                 } else {
@@ -108,16 +124,20 @@ impl Visitor<Value> for AstInterpreter {
                 }
             }
             (_, TokenType::Op(Op::Or), _) => {
-                let l = self.evaluate(left)?;
+                let l = self.eval_expr(left)?;
 
                 if l.is_truthy() {
                     Ok(l)
                 } else {
-                    let r = self.evaluate(right)?;
+                    let r = self.eval_expr(right)?;
                     Ok(r)
                 }
             }
             _ => panic!("unexpected logical op"),
         }
+    }
+
+    fn visit_statement_expr(&mut self, expr: &Expr) -> Result<Value, Error> {
+        self.eval_expr(expr)
     }
 }

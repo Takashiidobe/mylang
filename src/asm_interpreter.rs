@@ -3,6 +3,7 @@ use std::fmt;
 use crate::{
     expr::Expr,
     lexer::{Op, Token, TokenType, Value},
+    stmt::Stmt,
 };
 
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -126,9 +127,11 @@ impl Codegen {
         Self::default()
     }
 
-    pub fn program(&mut self, expr: &Expr) -> Vec<AsmInstruction> {
+    pub fn program(&mut self, stmts: &[Stmt]) -> Vec<AsmInstruction> {
         self.prologue();
-        self.expr(expr);
+        for stmt in stmts {
+            self.stmt(stmt);
+        }
         self.epilogue();
         self.instructions.clone()
     }
@@ -173,6 +176,12 @@ impl Codegen {
     fn pop(&mut self, reg: Reg) {
         self.add(AsmInstruction::Pop(reg));
         self.depth -= 1;
+    }
+
+    fn stmt(&mut self, stmt: &Stmt) {
+        match stmt {
+            Stmt::Expr { expr } => self.expr(expr),
+        }
     }
 
     fn expr(&mut self, expr: &Expr) {
@@ -323,6 +332,7 @@ impl Codegen {
                 }
                 _ => unreachable!(),
             },
+            Expr::Stmt { expr } => self.expr(expr),
         }
     }
 

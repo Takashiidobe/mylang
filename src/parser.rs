@@ -1,7 +1,8 @@
 use crate::{
     error::Error,
-    expr::Expr,
+    expr::{Expr, ExprVisitor},
     lexer::{Keyword, Op, Punct, SourceLocation, Token, TokenType, Value},
+    stmt::{Stmt, StmtVisitor},
 };
 use std::fmt;
 
@@ -11,25 +12,46 @@ pub struct Parser {
     current: usize,
 }
 
-pub trait Parse<P> {
-    fn parse(&mut self) -> Result<P, Error>;
-    fn expression(&mut self) -> Result<P, Error>;
-    fn or(&mut self) -> Result<P, Error>;
-    fn and(&mut self) -> Result<P, Error>;
-    fn equality(&mut self) -> Result<P, Error>;
-    fn comparison(&mut self) -> Result<P, Error>;
-    fn term(&mut self) -> Result<P, Error>;
-    fn factor(&mut self) -> Result<P, Error>;
-    fn unary(&mut self) -> Result<P, Error>;
-    fn primary(&mut self) -> Result<P, Error>;
+pub trait Parse {
+    fn parse(&mut self) -> Result<Vec<Stmt>, Error>;
+    fn expr(&mut self) -> Result<Expr, Error>;
+    fn expr_stmt(&mut self) -> Result<Expr, Error>;
+    fn stmt(&mut self) -> Result<Stmt, Error>;
+    fn or(&mut self) -> Result<Expr, Error>;
+    fn and(&mut self) -> Result<Expr, Error>;
+    fn equality(&mut self) -> Result<Expr, Error>;
+    fn comparison(&mut self) -> Result<Expr, Error>;
+    fn term(&mut self) -> Result<Expr, Error>;
+    fn factor(&mut self) -> Result<Expr, Error>;
+    fn unary(&mut self) -> Result<Expr, Error>;
+    fn primary(&mut self) -> Result<Expr, Error>;
 }
 
-impl Parse<Expr> for Parser {
-    fn parse(&mut self) -> Result<Expr, Error> {
-        self.expression()
+impl Parse for Parser {
+    fn parse(&mut self) -> Result<Vec<Stmt>, Error> {
+        let mut stmts = vec![];
+        while !self.is_at_end() {
+            stmts.push(self.stmt()?);
+        }
+
+        Ok(stmts)
     }
 
-    fn expression(&mut self) -> Result<Expr, Error> {
+    fn stmt(&mut self) -> Result<Stmt, Error> {
+        Ok(Stmt::Expr {
+            expr: Box::new(self.expr_stmt()?),
+        })
+    }
+
+    fn expr_stmt(&mut self) -> Result<Expr, Error> {
+        let expr = Expr::Stmt {
+            expr: Box::new(self.expr()?),
+        };
+        self.consume(&TokenType::Punct(Punct::Semicolon), "expected semicolon")?;
+        Ok(expr)
+    }
+
+    fn expr(&mut self) -> Result<Expr, Error> {
         self.or()
     }
 
@@ -169,18 +191,15 @@ impl Parse<Expr> for Parser {
                 value: token.value.unwrap_or_default(),
             }
         } else if self.r#match(&[TokenType::Punct(Punct::LParen)]) {
-            let expr = self.expression()?;
-            self.consume(
-                &TokenType::Punct(Punct::RParen),
-                "Expected ')' after expression.",
-            )?;
+            let expr = self.expr()?;
+            self.consume(&TokenType::Punct(Punct::RParen), "Expected ')' after expr.")?;
             Expr::Grouping {
                 expr: Box::new(expr),
             }
         } else {
             return Err(Error::Runtime {
                 token,
-                message: "Expected expression".to_string(),
+                message: "Expected expr".to_string(),
             });
         };
 
@@ -265,27 +284,25 @@ impl Parser {
     }
 }
 
-pub trait Visitor<R> {
-    fn visit_binary_expr(&mut self, left: &Expr, op: &Token, right: &Expr) -> Result<R, Error>;
-    fn visit_grouping_expr(&mut self, expr: &Expr) -> Result<R, Error>;
-    fn visit_literal_expr(&mut self, value: &Value) -> Result<R, Error>;
-    fn visit_unary_expr(&mut self, op: &Token, expr: &Expr) -> Result<R, Error>;
-    fn visit_logical_expr(&mut self, left: &Expr, op: &Token, right: &Expr) -> Result<R, Error>;
+pub trait Interpreter<R>: Evaluate<R> {
+    fn interpret(&mut self, stmts: &[Stmt]) -> Result<R, Error>;
 }
 
-pub trait Interpreter<R>: Visitor<R> {
-    fn interpret(&mut self, expr: &Expr) -> Result<R, Error>
+pub trait Evaluate<R> {
+    fn eval_stmt(&mut self, stmt: &Stmt) -> Result<R, Error>
     where
         Self: Sized,
+        Self: StmtVisitor<R>,
     {
-        self.evaluate(expr)
+        stmt.accept(self)
     }
 
-    fn evaluate(&mut self, expression: &Expr) -> Result<R, Error>
+    fn eval_expr(&mut self, expr: &Expr) -> Result<R, Error>
     where
         Self: Sized,
+        Self: ExprVisitor<R>,
     {
-        expression.accept(self)
+        expr.accept(self)
     }
 }
 
@@ -308,7 +325,7 @@ pub trait InterpreterErrors<R: fmt::Display> {
                 )
             }
             _ => {
-                format!("Invalid expression error. Was: {} {} {}", left, op, right)
+                format!("Invalid expr error. Was: {} {} {}", left, op, right)
             }
         };
         Err(Error::Runtime {
@@ -329,7 +346,6 @@ pub fn parser_error(token: &Token, message: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expr::Expr;
     use crate::lexer::Lexer;
     use crate::parser::Parse;
     use insta::assert_yaml_snapshot;
@@ -341,7 +357,7 @@ mod tests {
                 let mut scanner = Lexer::new($source);
                 let tokens = scanner.lex();
                 let mut parser = Parser::new(tokens);
-                assert_yaml_snapshot!(Parse::<Expr>::parse(&mut parser).unwrap());
+                assert_yaml_snapshot!(parser.parse().unwrap());
             }
         };
     }

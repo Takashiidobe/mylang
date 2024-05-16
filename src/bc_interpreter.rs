@@ -1,8 +1,9 @@
 use crate::{
     error::Error,
-    expr::Expr,
+    expr::{Expr, ExprVisitor},
     lexer::{Op, Token, TokenType, Value},
-    parser::{Interpreter, InterpreterErrors, Visitor},
+    parser::{Evaluate, Interpreter, InterpreterErrors},
+    stmt::{Stmt, StmtVisitor},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -28,14 +29,28 @@ pub struct BcInterpreter {
     pub ops: Vec<Opcode>,
 }
 
+impl Interpreter<()> for BcInterpreter {
+    fn interpret(&mut self, stmts: &[Stmt]) -> Result<(), Error> {
+        for stmt in stmts {
+            self.eval_stmt(stmt)?;
+        }
+        Ok(())
+    }
+}
+
+impl Evaluate<()> for BcInterpreter {}
 impl InterpreterErrors<Value> for BcInterpreter {}
 
-impl Interpreter<()> for BcInterpreter {}
+impl StmtVisitor<()> for BcInterpreter {
+    fn visit_expr_stmt(&mut self, expr: &Expr) -> Result<(), Error> {
+        self.visit_statement_expr(expr)
+    }
+}
 
-impl Visitor<()> for BcInterpreter {
+impl ExprVisitor<()> for BcInterpreter {
     fn visit_binary_expr(&mut self, left: &Expr, op: &Token, right: &Expr) -> Result<(), Error> {
-        self.evaluate(left)?;
-        self.evaluate(right)?;
+        self.eval_expr(left)?;
+        self.eval_expr(right)?;
 
         match &op.r#type {
             TokenType::Op(Op::Plus) => {
@@ -88,11 +103,11 @@ impl Visitor<()> for BcInterpreter {
     }
 
     fn visit_grouping_expr(&mut self, expr: &Expr) -> Result<(), Error> {
-        self.evaluate(expr)
+        self.eval_expr(expr)
     }
 
     fn visit_unary_expr(&mut self, op: &Token, expr: &Expr) -> Result<(), Error> {
-        self.evaluate(expr)?;
+        self.eval_expr(expr)?;
         match &op.r#type {
             TokenType::Op(Op::Minus) => {
                 self.ops.push(Opcode::Negate);
@@ -105,18 +120,22 @@ impl Visitor<()> for BcInterpreter {
     fn visit_logical_expr(&mut self, left: &Expr, op: &Token, right: &Expr) -> Result<(), Error> {
         match &op.r#type {
             TokenType::Op(Op::And) => {
-                self.evaluate(left)?;
-                self.evaluate(right)?;
+                self.eval_expr(left)?;
+                self.eval_expr(right)?;
                 self.ops.push(Opcode::And);
                 Ok(())
             }
             TokenType::Op(Op::Or) => {
-                self.evaluate(left)?;
-                self.evaluate(right)?;
+                self.eval_expr(left)?;
+                self.eval_expr(right)?;
                 self.ops.push(Opcode::Or);
                 Ok(())
             }
             _ => panic!("Invalid logical expr: {:?} {} {:?}", left, op, right),
         }
+    }
+
+    fn visit_statement_expr(&mut self, expr: &Expr) -> Result<(), Error> {
+        self.eval_expr(expr)
     }
 }
