@@ -1,17 +1,27 @@
-use crate::{bc_interpreter::Opcode, lexer::Value};
+use std::collections::HashMap;
+
+use crate::{
+    bc_interpreter::Opcode,
+    token::{Object, Token},
+};
 
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct BcCompiler {
     pub ops: Vec<Opcode>,
-    pub stack: Vec<Value>,
+    pub stack: Vec<Object>,
+    pub vars: HashMap<Token, Object>,
 }
 
 impl BcCompiler {
     pub fn new(ops: Vec<Opcode>) -> Self {
-        Self { ops, stack: vec![] }
+        Self {
+            ops,
+            stack: vec![],
+            vars: HashMap::default(),
+        }
     }
 
-    pub fn compile(&mut self) -> Option<Value> {
+    pub fn compile(&mut self) -> Option<Object> {
         for op in &self.ops {
             match op {
                 Opcode::Mul => {
@@ -19,8 +29,8 @@ impl BcCompiler {
                     let a = self.stack.pop()?;
 
                     match (a, b) {
-                        (Value::Number(l), Value::Number(r)) => {
-                            self.stack.push(Value::Number(l * r));
+                        (Object::Number(l), Object::Number(r)) => {
+                            self.stack.push(Object::Number(l * r));
                         }
                         _ => panic!("incorrect ops"),
                     }
@@ -30,8 +40,8 @@ impl BcCompiler {
                     let a = self.stack.pop()?;
 
                     match (a, b) {
-                        (Value::Number(l), Value::Number(r)) => {
-                            self.stack.push(Value::Number(l / r));
+                        (Object::Number(l), Object::Number(r)) => {
+                            self.stack.push(Object::Number(l / r));
                         }
                         _ => panic!("incorrect ops"),
                     }
@@ -41,13 +51,13 @@ impl BcCompiler {
                     let a = self.stack.pop()?;
 
                     match (a, b) {
-                        (Value::Number(l), Value::Number(r)) => {
-                            self.stack.push(Value::Number(l + r));
+                        (Object::Number(l), Object::Number(r)) => {
+                            self.stack.push(Object::Number(l + r));
                         }
-                        (Value::String(l), Value::String(r)) => {
+                        (Object::String(l), Object::String(r)) => {
                             let mut res = l.clone();
                             res.push_str(&r);
-                            self.stack.push(Value::String(res));
+                            self.stack.push(Object::String(res));
                         }
                         _ => panic!("incorrect ops"),
                     }
@@ -56,8 +66,8 @@ impl BcCompiler {
                     let b = self.stack.pop()?;
                     let a = self.stack.pop()?;
                     match (a, b) {
-                        (Value::Number(l), Value::Number(r)) => {
-                            self.stack.push(Value::Number(l - r));
+                        (Object::Number(l), Object::Number(r)) => {
+                            self.stack.push(Object::Number(l - r));
                         }
                         _ => panic!("incorrect ops"),
                     }
@@ -65,8 +75,8 @@ impl BcCompiler {
                 Opcode::Negate => {
                     let val = self.stack.pop()?;
                     match val {
-                        Value::Number(num) => {
-                            self.stack.push(Value::Number(-num));
+                        Object::Number(num) => {
+                            self.stack.push(Object::Number(-num));
                         }
                         _ => panic!("incorrect ops"),
                     }
@@ -78,8 +88,8 @@ impl BcCompiler {
                     let b = self.stack.pop()?;
                     let a = self.stack.pop()?;
                     match (a, b) {
-                        (Value::Number(l), Value::Number(r)) => {
-                            self.stack.push(Value::Bool(l > r));
+                        (Object::Number(l), Object::Number(r)) => {
+                            self.stack.push(Object::Bool(l > r));
                         }
                         _ => panic!("incorrect ops"),
                     }
@@ -88,8 +98,8 @@ impl BcCompiler {
                     let b = self.stack.pop()?;
                     let a = self.stack.pop()?;
                     match (a, b) {
-                        (Value::Number(l), Value::Number(r)) => {
-                            self.stack.push(Value::Bool(l >= r));
+                        (Object::Number(l), Object::Number(r)) => {
+                            self.stack.push(Object::Bool(l >= r));
                         }
                         _ => panic!("incorrect ops"),
                     }
@@ -98,8 +108,8 @@ impl BcCompiler {
                     let b = self.stack.pop()?;
                     let a = self.stack.pop()?;
                     match (a, b) {
-                        (Value::Number(l), Value::Number(r)) => {
-                            self.stack.push(Value::Bool(l < r));
+                        (Object::Number(l), Object::Number(r)) => {
+                            self.stack.push(Object::Bool(l < r));
                         }
                         _ => panic!("incorrect ops"),
                     }
@@ -108,8 +118,8 @@ impl BcCompiler {
                     let b = self.stack.pop()?;
                     let a = self.stack.pop()?;
                     match (a, b) {
-                        (Value::Number(l), Value::Number(r)) => {
-                            self.stack.push(Value::Bool(l <= r));
+                        (Object::Number(l), Object::Number(r)) => {
+                            self.stack.push(Object::Bool(l <= r));
                         }
                         _ => panic!("incorrect ops"),
                     }
@@ -118,14 +128,14 @@ impl BcCompiler {
                     let b = self.stack.pop()?;
                     let a = self.stack.pop()?;
                     match (a, b) {
-                        (Value::Number(l), Value::Number(r)) => {
-                            self.stack.push(Value::Bool(l != r));
+                        (Object::Number(l), Object::Number(r)) => {
+                            self.stack.push(Object::Bool(l != r));
                         }
-                        (Value::String(l), Value::String(r)) => {
-                            self.stack.push(Value::Bool(l != r));
+                        (Object::String(l), Object::String(r)) => {
+                            self.stack.push(Object::Bool(l != r));
                         }
-                        (Value::Bool(l), Value::Bool(r)) => {
-                            self.stack.push(Value::Bool(l != r));
+                        (Object::Bool(l), Object::Bool(r)) => {
+                            self.stack.push(Object::Bool(l != r));
                         }
                         _ => panic!("incorrect ops"),
                     }
@@ -134,14 +144,14 @@ impl BcCompiler {
                     let b = self.stack.pop()?;
                     let a = self.stack.pop()?;
                     match (a, b) {
-                        (Value::Number(l), Value::Number(r)) => {
-                            self.stack.push(Value::Bool(l == r));
+                        (Object::Number(l), Object::Number(r)) => {
+                            self.stack.push(Object::Bool(l == r));
                         }
-                        (Value::String(l), Value::String(r)) => {
-                            self.stack.push(Value::Bool(l == r));
+                        (Object::String(l), Object::String(r)) => {
+                            self.stack.push(Object::Bool(l == r));
                         }
-                        (Value::Bool(l), Value::Bool(r)) => {
-                            self.stack.push(Value::Bool(l == r));
+                        (Object::Bool(l), Object::Bool(r)) => {
+                            self.stack.push(Object::Bool(l == r));
                         }
                         _ => panic!("incorrect ops"),
                     }
@@ -150,8 +160,8 @@ impl BcCompiler {
                     let b = self.stack.pop()?;
                     let a = self.stack.pop()?;
                     match (a, b) {
-                        (Value::Bool(l), Value::Bool(r)) => {
-                            self.stack.push(Value::Bool(l && r));
+                        (Object::Bool(l), Object::Bool(r)) => {
+                            self.stack.push(Object::Bool(l && r));
                         }
                         (l, r) => {
                             if l.is_truthy() && r.is_truthy() {
@@ -166,8 +176,8 @@ impl BcCompiler {
                     let b = self.stack.pop()?;
                     let a = self.stack.pop()?;
                     match (a, b) {
-                        (Value::Bool(l), Value::Bool(r)) => {
-                            self.stack.push(Value::Bool(l || r));
+                        (Object::Bool(l), Object::Bool(r)) => {
+                            self.stack.push(Object::Bool(l || r));
                         }
                         (l, r) => {
                             if l.is_truthy() {
@@ -177,6 +187,20 @@ impl BcCompiler {
                             }
                         }
                     }
+                }
+                Opcode::Print => {
+                    let top = self.stack.pop()?;
+                    println!("{}", top);
+                }
+                Opcode::Load(op) => {
+                    if let Some(val) = self.vars.get(op) {
+                        self.stack.push(val.clone());
+                    } else {
+                        panic!("variable {} was not found", op);
+                    }
+                }
+                Opcode::Store(op, val) => {
+                    self.vars.insert(op.clone(), val.clone());
                 }
             }
         }

@@ -1,15 +1,12 @@
+use std::convert;
+use std::fmt;
+use std::io;
+
+use crate::token::Object;
+use crate::token::{Token, TokenType};
+
 #[cfg(test)]
 use serde::Serialize;
-
-use crate::lexer::Token;
-use std::{fmt, io};
-
-#[derive(Debug)]
-pub enum Error {
-    Io(io::Error),
-    Parse { token: Token, message: String },
-    Runtime { token: Token, message: String },
-}
 
 #[cfg(test)]
 impl Serialize for Error {
@@ -19,6 +16,30 @@ impl Serialize for Error {
     {
         serializer.serialize_str(&self.to_string())
     }
+}
+
+pub fn error(line: usize, message: &str) {
+    report(line, "", message);
+}
+
+pub fn report(line: usize, loc: &str, message: &str) {
+    eprintln!("[line {}] Error{}: {}", line, loc, message);
+}
+
+pub fn parser_error(token: &Token, message: &str) {
+    if token.r#type == TokenType::Eof {
+        report(token.line, " at end", message);
+    } else {
+        report(token.line, &format!(" at '{}'", token.lexeme), message);
+    }
+}
+
+#[derive(Debug)]
+pub enum Error {
+    Io(io::Error),
+    Parse { token: Token, message: String },
+    Runtime { token: Token, message: String },
+    Return { value: Object },
 }
 
 impl fmt::Display for Error {
@@ -31,6 +52,7 @@ impl fmt::Display for Error {
             Error::Runtime { token, message } => {
                 write!(f, "RuntimeError at token: {}, message: {}", token, message)
             }
+            Error::Return { value } => write!(f, "Return {:?}", value),
         }
     }
 }
@@ -41,7 +63,7 @@ impl std::error::Error for Error {
     }
 }
 
-impl From<io::Error> for Error {
+impl convert::From<io::Error> for Error {
     fn from(e: io::Error) -> Self {
         Error::Io(e)
     }

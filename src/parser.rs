@@ -1,8 +1,8 @@
 use crate::{
-    error::Error,
+    error::{parser_error, Error},
     expr::{Expr, ExprVisitor},
-    lexer::{Keyword, Op, Punct, SourceLocation, Token, TokenType, Value},
     stmt::{Stmt, StmtVisitor},
+    token::{Object, Token, TokenType},
 };
 use std::fmt;
 
@@ -14,9 +14,13 @@ pub struct Parser {
 
 pub trait Parse {
     fn parse(&mut self) -> Result<Vec<Stmt>, Error>;
-    fn expr(&mut self) -> Result<Expr, Error>;
-    fn expr_stmt(&mut self) -> Result<Expr, Error>;
+    fn decl(&mut self) -> Result<Stmt, Error>;
+    fn var_decl(&mut self) -> Result<Stmt, Error>;
     fn stmt(&mut self) -> Result<Stmt, Error>;
+    fn print_stmt(&mut self) -> Result<Stmt, Error>;
+    fn expr(&mut self) -> Result<Expr, Error>;
+    fn assign(&mut self) -> Result<Expr, Error>;
+    fn expr_stmt(&mut self) -> Result<Stmt, Error>;
     fn or(&mut self) -> Result<Expr, Error>;
     fn and(&mut self) -> Result<Expr, Error>;
     fn equality(&mut self) -> Result<Expr, Error>;
@@ -31,34 +35,88 @@ impl Parse for Parser {
     fn parse(&mut self) -> Result<Vec<Stmt>, Error> {
         let mut stmts = vec![];
         while !self.is_at_end() {
-            stmts.push(self.stmt()?);
+            stmts.push(self.decl()?);
         }
 
         Ok(stmts)
     }
 
-    fn stmt(&mut self) -> Result<Stmt, Error> {
-        Ok(Stmt::Expr {
-            expr: Box::new(self.expr_stmt()?),
-        })
+    fn decl(&mut self) -> Result<Stmt, Error> {
+        let stmt = if self.r#match(&[TokenType::Var]) {
+            self.var_decl()
+        } else {
+            self.stmt()
+        };
+
+        match stmt {
+            Err(e) => {
+                self.synchronize();
+                Err(e)
+            }
+            stmt => stmt,
+        }
     }
 
-    fn expr_stmt(&mut self) -> Result<Expr, Error> {
-        let expr = Expr::Stmt {
-            expr: Box::new(self.expr()?),
+    fn var_decl(&mut self) -> Result<Stmt, Error> {
+        let name = self.consume(&TokenType::Identifier, "Expect variable name.")?;
+
+        let initializer = if self.r#match(&[TokenType::Equal]) {
+            Some(self.expr()?)
+        } else {
+            None
         };
-        self.consume(&TokenType::Punct(Punct::Semicolon), "expected semicolon")?;
-        Ok(expr)
+
+        self.consume(
+            &TokenType::Semicolon,
+            "Expect ';' after variable declaration.",
+        )?;
+
+        Ok(Stmt::Var { name, initializer })
+    }
+
+    fn stmt(&mut self) -> Result<Stmt, Error> {
+        if self.r#match(&[TokenType::Print]) {
+            self.print_stmt()
+        } else {
+            self.expr_stmt()
+        }
+    }
+
+    fn print_stmt(&mut self) -> Result<Stmt, Error> {
+        let expr = self.expr()?;
+        self.consume(&TokenType::Semicolon, "expected ';' after value.")?;
+        Ok(Stmt::Print { expr })
     }
 
     fn expr(&mut self) -> Result<Expr, Error> {
-        self.or()
+        self.assign()
+    }
+
+    fn expr_stmt(&mut self) -> Result<Stmt, Error> {
+        let expr = self.expr()?;
+        self.consume(&TokenType::Semicolon, "expected ';' after expr.")?;
+        Ok(Stmt::Expr { expr })
+    }
+
+    fn assign(&mut self) -> Result<Expr, Error> {
+        let expr = self.or()?;
+
+        if self.r#match(&[TokenType::Equal]) {
+            let value = Box::new(self.assign()?);
+            if let Expr::Var { name } = expr {
+                return Ok(Expr::Assign { name, expr: value });
+            }
+            let equals = &self.previous();
+            self.error(equals, "Invalid assignment target.");
+        }
+
+        Ok(expr)
     }
 
     fn or(&mut self) -> Result<Expr, Error> {
         let mut expr = self.and()?;
 
-        while self.r#match(&[TokenType::Op(Op::Or)]) {
+        while self.r#match(&[TokenType::Or]) {
             let op = self.previous();
             let right = Box::new(self.and()?);
             expr = Expr::Logical {
@@ -74,7 +132,7 @@ impl Parse for Parser {
     fn and(&mut self) -> Result<Expr, Error> {
         let mut expr = self.equality()?;
 
-        while self.r#match(&[TokenType::Op(Op::And)]) {
+        while self.r#match(&[TokenType::And]) {
             let op = self.previous();
             let right = Box::new(self.equality()?);
             expr = Expr::Logical {
@@ -90,7 +148,7 @@ impl Parse for Parser {
     fn equality(&mut self) -> Result<Expr, Error> {
         let mut expr = self.comparison()?;
 
-        while self.r#match(&[TokenType::Op(Op::BangEqual), TokenType::Op(Op::EqualEqual)]) {
+        while self.r#match(&[TokenType::BangEqual, TokenType::EqualEqual]) {
             let op = self.previous();
             let right = self.comparison()?;
             expr = Expr::Binary {
@@ -107,10 +165,10 @@ impl Parse for Parser {
         let mut expr = self.term()?;
 
         while self.r#match(&[
-            TokenType::Op(Op::Gt),
-            TokenType::Op(Op::Ge),
-            TokenType::Op(Op::Lt),
-            TokenType::Op(Op::Le),
+            TokenType::Greater,
+            TokenType::GreaterEqual,
+            TokenType::Less,
+            TokenType::LessEqual,
         ]) {
             let op = self.previous();
             let right = self.term()?;
@@ -127,7 +185,7 @@ impl Parse for Parser {
     fn term(&mut self) -> Result<Expr, Error> {
         let mut expr = self.factor()?;
 
-        while self.r#match(&[TokenType::Op(Op::Minus), TokenType::Op(Op::Plus)]) {
+        while self.r#match(&[TokenType::Minus, TokenType::Plus]) {
             let op = self.previous();
             let right = self.factor()?;
             expr = Expr::Binary {
@@ -143,7 +201,7 @@ impl Parse for Parser {
     fn factor(&mut self) -> Result<Expr, Error> {
         let mut expr = self.unary()?;
 
-        while self.r#match(&[TokenType::Op(Op::Slash), TokenType::Op(Op::Star)]) {
+        while self.r#match(&[TokenType::Slash, TokenType::Star]) {
             let op = self.previous();
             let right = self.unary()?;
             expr = Expr::Binary {
@@ -157,12 +215,12 @@ impl Parse for Parser {
     }
 
     fn unary(&mut self) -> Result<Expr, Error> {
-        if self.r#match(&[TokenType::Op(Op::Plus)]) {
+        if self.r#match(&[TokenType::Plus]) {
             self.previous();
             return self.unary();
         }
 
-        if self.r#match(&[TokenType::Op(Op::Minus)]) {
+        if self.r#match(&[TokenType::Minus]) {
             let op = self.previous();
             return Ok(Expr::Unary {
                 op,
@@ -176,23 +234,25 @@ impl Parse for Parser {
     fn primary(&mut self) -> Result<Expr, Error> {
         let token = self.peek();
 
-        let expr = if self.r#match(&[TokenType::Keyword(Keyword::False)]) {
+        let expr = if self.r#match(&[TokenType::False]) {
             Expr::Literal {
-                value: Value::Bool(false),
+                value: Object::Bool(false),
             }
-        } else if self.r#match(&[TokenType::Keyword(Keyword::True)]) {
+        } else if self.r#match(&[TokenType::True]) {
             Expr::Literal {
-                value: Value::Bool(true),
+                value: Object::Bool(true),
             }
-        } else if self.r#match(&[TokenType::Keyword(Keyword::Nil)]) {
-            Expr::Literal { value: Value::Nil }
+        } else if self.r#match(&[TokenType::Nil]) {
+            Expr::Literal { value: Object::Nil }
         } else if self.r#match(&[TokenType::String, TokenType::Number]) {
             Expr::Literal {
-                value: token.value.unwrap_or_default(),
+                value: token.literal.unwrap_or_default(),
             }
-        } else if self.r#match(&[TokenType::Punct(Punct::LParen)]) {
+        } else if self.r#match(&[TokenType::Identifier]) {
+            Expr::Var { name: token }
+        } else if self.r#match(&[TokenType::LeftParen]) {
             let expr = self.expr()?;
-            self.consume(&TokenType::Punct(Punct::RParen), "Expected ')' after expr.")?;
+            self.consume(&TokenType::RightParen, "Expected ')' after expr.")?;
             Expr::Grouping {
                 expr: Box::new(expr),
             }
@@ -263,11 +323,11 @@ impl Parser {
         self.advance();
 
         while !self.is_at_end() {
-            if self.previous().r#type == TokenType::Punct(Punct::Semicolon) {
+            if self.previous().r#type == TokenType::Semicolon {
                 return;
             }
 
-            if let TokenType::Keyword(_) = self.peek().r#type {
+            if let TokenType::Identifier = self.peek().r#type {
                 return;
             }
 
@@ -309,16 +369,16 @@ pub trait Evaluate<R> {
 pub trait InterpreterErrors<R: fmt::Display> {
     fn runtime_error(&self, left: &R, op: &Token, right: &R) -> Result<R, Error> {
         let message = match op.r#type {
-            TokenType::Op(Op::Minus)
-            | TokenType::Op(Op::Slash)
-            | TokenType::Op(Op::Star)
-            | TokenType::Op(Op::Gt)
-            | TokenType::Op(Op::Ge)
-            | TokenType::Op(Op::Lt)
-            | TokenType::Op(Op::Le) => {
+            TokenType::Minus
+            | TokenType::Slash
+            | TokenType::Star
+            | TokenType::Greater
+            | TokenType::GreaterEqual
+            | TokenType::Less
+            | TokenType::LessEqual => {
                 format!("Operands must be numbers. Was: {} {} {}", left, op, right)
             }
-            TokenType::Op(Op::Plus) => {
+            TokenType::Plus => {
                 format!(
                     "Operands must be two numbers or two strings. Was: {} {} {}",
                     left, op, right
@@ -335,14 +395,6 @@ pub trait InterpreterErrors<R: fmt::Display> {
     }
 }
 
-pub fn report(loc: &SourceLocation, message: &str) {
-    eprintln!("[line {}, col {}] Error: {}", loc.line, loc.col, message);
-}
-
-pub fn parser_error(token: &Token, message: &str) {
-    report(&token.loc, message);
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -355,7 +407,7 @@ mod tests {
             #[test]
             fn $name() {
                 let mut scanner = Lexer::new($source);
-                let tokens = scanner.lex();
+                let tokens = scanner.scan_tokens();
                 let mut parser = Parser::new(tokens);
                 assert_yaml_snapshot!(parser.parse().unwrap());
             }

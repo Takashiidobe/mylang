@@ -3,8 +3,9 @@ name = "mylang"
 version = "0.1.0"
 edition = "2021"
 
-[dependencies]
-
 [dev-dependencies]
 insta = { version = "1.38.0", features = ["yaml"] }
 serde = { version = "1.0.198", features = ["derive"] }
+
+[dependencies]
+rustyline = "14.0.0"

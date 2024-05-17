@@ -1,14 +1,17 @@
 use crate::{
     error::Error,
     expr::{Expr, ExprVisitor},
-    lexer::{Op, Token, TokenType, Value},
     parser::{Evaluate, Interpreter, InterpreterErrors},
     stmt::{Stmt, StmtVisitor},
+    token::{Object, Token, TokenType},
 };
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Opcode {
-    Constant(Value),
+    Constant(Object),
+    Load(Token),
+    Store(Token, Object),
+    Print,
     Negate,
     Plus,
     Sub,
@@ -39,11 +42,34 @@ impl Interpreter<()> for BcInterpreter {
 }
 
 impl Evaluate<()> for BcInterpreter {}
-impl InterpreterErrors<Value> for BcInterpreter {}
+impl Evaluate<Object> for BcInterpreter {}
+impl InterpreterErrors<Object> for BcInterpreter {}
 
 impl StmtVisitor<()> for BcInterpreter {
     fn visit_expr_stmt(&mut self, expr: &Expr) -> Result<(), Error> {
-        self.visit_statement_expr(expr)
+        self.eval_expr(expr)
+    }
+
+    fn visit_var_stmt(&mut self, name: &Token, initializer: &Option<Expr>) -> Result<(), Error> {
+        if let Some(init) = initializer {
+            self.eval_expr(init)?;
+        } else {
+            self.ops.push(Opcode::Constant(Object::Nil));
+        }
+
+        let top = self.ops.pop();
+        if let Some(Opcode::Constant(val)) = top {
+            self.ops.push(Opcode::Store(name.clone(), val));
+        } else {
+            panic!("Invalid variable");
+        }
+        Ok(())
+    }
+
+    fn visit_print_stmt(&mut self, expr: &Expr) -> Result<(), Error> {
+        self.eval_expr(expr)?;
+        self.ops.push(Opcode::Print);
+        Ok(())
     }
 }
 
@@ -53,43 +79,43 @@ impl ExprVisitor<()> for BcInterpreter {
         self.eval_expr(right)?;
 
         match &op.r#type {
-            TokenType::Op(Op::Plus) => {
+            TokenType::Plus => {
                 self.ops.push(Opcode::Plus);
                 Ok(())
             }
-            TokenType::Op(Op::Minus) => {
+            TokenType::Minus => {
                 self.ops.push(Opcode::Sub);
                 Ok(())
             }
-            TokenType::Op(Op::Star) => {
+            TokenType::Star => {
                 self.ops.push(Opcode::Mul);
                 Ok(())
             }
-            TokenType::Op(Op::Slash) => {
+            TokenType::Slash => {
                 self.ops.push(Opcode::Div);
                 Ok(())
             }
-            TokenType::Op(Op::Gt) => {
+            TokenType::Greater => {
                 self.ops.push(Opcode::Gt);
                 Ok(())
             }
-            TokenType::Op(Op::Ge) => {
+            TokenType::GreaterEqual => {
                 self.ops.push(Opcode::Ge);
                 Ok(())
             }
-            TokenType::Op(Op::Lt) => {
+            TokenType::Less => {
                 self.ops.push(Opcode::Lt);
                 Ok(())
             }
-            TokenType::Op(Op::Le) => {
+            TokenType::LessEqual => {
                 self.ops.push(Opcode::Le);
                 Ok(())
             }
-            TokenType::Op(Op::BangEqual) => {
+            TokenType::BangEqual => {
                 self.ops.push(Opcode::Ne);
                 Ok(())
             }
-            TokenType::Op(Op::EqualEqual) => {
+            TokenType::EqualEqual => {
                 self.ops.push(Opcode::EqEq);
                 Ok(())
             }
@@ -97,7 +123,7 @@ impl ExprVisitor<()> for BcInterpreter {
         }
     }
 
-    fn visit_literal_expr(&mut self, value: &Value) -> Result<(), Error> {
+    fn visit_literal_expr(&mut self, value: &Object) -> Result<(), Error> {
         self.ops.push(Opcode::Constant(value.clone()));
         Ok(())
     }
@@ -109,7 +135,7 @@ impl ExprVisitor<()> for BcInterpreter {
     fn visit_unary_expr(&mut self, op: &Token, expr: &Expr) -> Result<(), Error> {
         self.eval_expr(expr)?;
         match &op.r#type {
-            TokenType::Op(Op::Minus) => {
+            TokenType::Minus => {
                 self.ops.push(Opcode::Negate);
             }
             _ => panic!("Invalid unary expr: {} {:?}", op, expr),
@@ -118,16 +144,15 @@ impl ExprVisitor<()> for BcInterpreter {
     }
 
     fn visit_logical_expr(&mut self, left: &Expr, op: &Token, right: &Expr) -> Result<(), Error> {
+        self.eval_expr(left)?;
+        self.eval_expr(right)?;
+
         match &op.r#type {
-            TokenType::Op(Op::And) => {
-                self.eval_expr(left)?;
-                self.eval_expr(right)?;
+            TokenType::And => {
                 self.ops.push(Opcode::And);
                 Ok(())
             }
-            TokenType::Op(Op::Or) => {
-                self.eval_expr(left)?;
-                self.eval_expr(right)?;
+            TokenType::Or => {
                 self.ops.push(Opcode::Or);
                 Ok(())
             }
@@ -135,7 +160,19 @@ impl ExprVisitor<()> for BcInterpreter {
         }
     }
 
-    fn visit_statement_expr(&mut self, expr: &Expr) -> Result<(), Error> {
-        self.eval_expr(expr)
+    fn visit_assign_expr(&mut self, name: &Token, expr: &Expr) -> Result<(), Error> {
+        self.eval_expr(expr)?;
+        let top = self.ops.pop();
+        if let Some(Opcode::Constant(val)) = top {
+            self.ops.push(Opcode::Store(name.clone(), val));
+        } else {
+            panic!("Invalid variable");
+        }
+        Ok(())
+    }
+
+    fn visit_var_expr(&mut self, op: &Token) -> Result<(), Error> {
+        self.ops.push(Opcode::Load(op.clone()));
+        Ok(())
     }
 }
