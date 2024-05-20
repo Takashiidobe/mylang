@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::{collections::HashMap, fmt};
 
 use crate::{
@@ -238,6 +239,35 @@ impl Codegen {
                 self.add(AsmInstruction::Xor(Reg::Rax, Reg::Rax));
                 self.add(AsmInstruction::Call("printf".to_string()));
                 self.add(AsmInstruction::Xor(Reg::Rax, Reg::Rax));
+            }
+            Stmt::Block { stmts } => {
+                for stmt in stmts {
+                    self.stmt(stmt);
+                }
+            }
+            Stmt::If { cond, then, r#else } => {
+                let count = self.get_count();
+                self.expr(cond);
+                self.add(AsmInstruction::Cmp(Address::Immediate(0.0), Reg::Rax));
+                self.add(AsmInstruction::Je(format!(".L.else.{}", count)));
+                self.stmt(then);
+                self.add(AsmInstruction::Jmp(format!(".L.end.{}", count)));
+                self.add(AsmInstruction::Label(format!(".L.else.{}", count)));
+                if let Some(else_branch) = r#else.borrow() {
+                    self.stmt(else_branch);
+                }
+                self.add(AsmInstruction::Label(format!(".L.end.{}", count)));
+            }
+            Stmt::While { cond, body } => {
+                let count = self.get_count();
+
+                self.add(AsmInstruction::Label(format!(".L.begin.{}", count)));
+                self.expr(cond);
+                self.add(AsmInstruction::Cmp(Address::Immediate(0.0), Reg::Rax));
+                self.add(AsmInstruction::Je(format!(".L.end.{}", count)));
+                self.stmt(body);
+                self.add(AsmInstruction::Jmp(format!(".L.begin.{}", count)));
+                self.add(AsmInstruction::Label(format!(".L.end.{}", count)));
             }
         }
     }

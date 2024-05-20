@@ -34,13 +34,21 @@ impl AstPrinter {
         r.push(')');
         Ok(r)
     }
+
+    fn parenthesize_stmts(&mut self, stmts: &[&Stmt]) -> Result<String, Error> {
+        let mut s = String::new();
+        for stmt in stmts {
+            s.push_str(&self.eval_stmt(stmt)?);
+            s.push('\n');
+        }
+        s.pop();
+        Ok(s)
+    }
 }
 
 impl StmtVisitor<String> for AstPrinter {
     fn visit_expr_stmt(&mut self, expr: &Expr) -> Result<String, Error> {
-        let mut s = String::default();
-        s.push_str(&expr.accept(self)?);
-        Ok(s)
+        Ok(expr.accept(self)?.to_string())
     }
 
     fn visit_var_stmt(
@@ -57,6 +65,39 @@ impl StmtVisitor<String> for AstPrinter {
 
     fn visit_print_stmt(&mut self, expr: &Expr) -> Result<String, Error> {
         self.parenthesize("print".to_string(), &[expr])
+    }
+
+    fn visit_if_stmt(
+        &mut self,
+        cond: &Expr,
+        then: &Stmt,
+        r#else: &Option<Stmt>,
+    ) -> Result<String, Error> {
+        let mut s = String::new();
+        s.push_str(&self.parenthesize("if".to_string(), &[cond])?);
+        s.push_str(&self.eval_stmt(then)?);
+        if let Some(else_cond) = r#else {
+            s.push_str(&self.eval_stmt(else_cond)?);
+        }
+        Ok(s)
+    }
+
+    fn visit_while_stmt(&mut self, cond: &Expr, body: &Stmt) -> Result<String, Error> {
+        let mut s = String::new();
+        s.push_str(&self.parenthesize("while".to_string(), &[cond])?);
+        s.push('\n');
+        s.push_str(&self.parenthesize_stmts(&[body])?);
+        Ok(s)
+    }
+
+    fn visit_block_stmt(&mut self, stmts: &[Stmt]) -> Result<String, Error> {
+        let mut s = String::new();
+        for stmt in stmts {
+            s.push_str(&self.eval_stmt(stmt)?);
+            s.push('\n');
+        }
+        s.pop();
+        Ok(s)
     }
 }
 

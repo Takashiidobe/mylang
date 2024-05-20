@@ -10,6 +10,7 @@ pub struct BcCompiler {
     pub ops: Vec<Opcode>,
     pub stack: Vec<Object>,
     pub vars: HashMap<Token, Object>,
+    pub ip: usize,
 }
 
 impl BcCompiler {
@@ -18,11 +19,13 @@ impl BcCompiler {
             ops,
             stack: vec![],
             vars: HashMap::default(),
+            ip: 0,
         }
     }
 
-    pub fn compile(&mut self) -> Option<Object> {
-        for op in &self.ops {
+    pub fn compile(&mut self) -> Option<()> {
+        while self.ip < self.ops.len() {
+            let op = &self.ops[self.ip];
             match op {
                 Opcode::Mul => {
                     let b = self.stack.pop()?;
@@ -202,8 +205,28 @@ impl BcCompiler {
                 Opcode::Store(op, val) => {
                     self.vars.insert(op.clone(), val.clone());
                 }
+                Opcode::Jump(offset) => {
+                    dbg!(&self.ops);
+                    dbg!(offset);
+                    println!("can jump by {}", offset);
+                    self.ip += offset;
+                }
+                Opcode::JumpIfFalse(offset) => {
+                    let top = self.stack.pop()?;
+                    dbg!(&self.ops);
+                    dbg!(offset);
+                    dbg!(&top);
+                    if !top.is_truthy() {
+                        println!("can jump by {}", offset);
+                        self.ip += offset;
+                    }
+                }
+                Opcode::Pop => {
+                    self.stack.pop()?;
+                }
             }
+            self.ip += 1;
         }
-        self.stack.pop()
+        Some(())
     }
 }

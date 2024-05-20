@@ -53,6 +53,36 @@ impl StmtVisitor<()> for AstInterpreter {
         println!("{}", val);
         Ok(())
     }
+
+    fn visit_if_stmt(
+        &mut self,
+        cond: &Expr,
+        then: &Stmt,
+        r#else: &Option<Stmt>,
+    ) -> Result<(), Error> {
+        let evaled_cond = self.eval_expr(cond)?;
+        if evaled_cond.is_truthy() {
+            self.eval_stmt(then)
+        } else if let Some(else_stmt) = r#else {
+            self.eval_stmt(else_stmt)
+        } else {
+            Ok(())
+        }
+    }
+
+    fn visit_while_stmt(&mut self, cond: &Expr, body: &Stmt) -> Result<(), Error> {
+        while self.eval_expr(cond)?.is_truthy() {
+            self.eval_stmt(body)?;
+        }
+        Ok(())
+    }
+
+    fn visit_block_stmt(&mut self, stmts: &[Stmt]) -> Result<(), Error> {
+        for stmt in stmts {
+            self.eval_stmt(stmt)?;
+        }
+        Ok(())
+    }
 }
 
 impl ExprVisitor<Object> for AstInterpreter {
@@ -128,46 +158,16 @@ impl ExprVisitor<Object> for AstInterpreter {
         op: &Token,
         right: &Expr,
     ) -> Result<Object, Error> {
-        match (left, &op.r#type, right) {
-            (
-                Expr::Literal {
-                    value: Object::Bool(l),
-                },
-                TokenType::And,
-                Expr::Literal {
-                    value: Object::Bool(r),
-                },
-            ) => Ok(Object::Bool(*l && *r)),
-            (
-                Expr::Literal {
-                    value: Object::Bool(l),
-                },
-                TokenType::Or,
-                Expr::Literal {
-                    value: Object::Bool(r),
-                },
-            ) => Ok(Object::Bool(*l || *r)),
-            (_, TokenType::And, _) => {
-                let l = self.eval_expr(left)?;
-                let r = self.eval_expr(right)?;
-                if l.is_truthy() && r.is_truthy() {
-                    Ok(r)
-                } else {
-                    Ok(l)
-                }
-            }
-            (_, TokenType::Or, _) => {
-                let l = self.eval_expr(left)?;
+        let l = self.eval_expr(left)?;
 
-                if l.is_truthy() {
-                    Ok(l)
-                } else {
-                    let r = self.eval_expr(right)?;
-                    Ok(r)
-                }
+        if op.r#type == TokenType::Or {
+            if l.is_truthy() {
+                return Ok(l);
             }
-            _ => panic!("unexpected logical op"),
+        } else if !l.is_truthy() {
+            return Ok(l);
         }
+        self.eval_expr(right)
     }
 
     fn visit_assign_expr(&mut self, name: &Token, expr: &Expr) -> Result<Object, Error> {

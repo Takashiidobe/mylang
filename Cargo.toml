@@ -8,4 +8,4 @@ insta = { version = "1.38.0", features = ["yaml"] }
 serde = { version = "1.0.198", features = ["derive"] }
 
 [dependencies]
-rustyline = "14.0.0"
+rustyline = { version = "14.0.0", features = ["derive", "with-file-history"] }

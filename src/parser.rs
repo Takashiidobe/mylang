@@ -17,7 +17,11 @@ pub trait Parse {
     fn decl(&mut self) -> Result<Stmt, Error>;
     fn var_decl(&mut self) -> Result<Stmt, Error>;
     fn stmt(&mut self) -> Result<Stmt, Error>;
+    fn for_stmt(&mut self) -> Result<Stmt, Error>;
+    fn if_stmt(&mut self) -> Result<Stmt, Error>;
     fn print_stmt(&mut self) -> Result<Stmt, Error>;
+    fn while_stmt(&mut self) -> Result<Stmt, Error>;
+    fn block(&mut self) -> Result<Vec<Stmt>, Error>;
     fn expr(&mut self) -> Result<Expr, Error>;
     fn assign(&mut self) -> Result<Expr, Error>;
     fn expr_stmt(&mut self) -> Result<Stmt, Error>;
@@ -75,17 +79,111 @@ impl Parse for Parser {
     }
 
     fn stmt(&mut self) -> Result<Stmt, Error> {
-        if self.r#match(&[TokenType::Print]) {
+        if self.r#match(&[TokenType::For]) {
+            self.for_stmt()
+        } else if self.r#match(&[TokenType::Print]) {
             self.print_stmt()
+        } else if self.r#match(&[TokenType::If]) {
+            self.if_stmt()
+        } else if self.r#match(&[TokenType::While]) {
+            self.while_stmt()
+        } else if self.r#match(&[TokenType::LeftBrace]) {
+            Ok(Stmt::Block {
+                stmts: self.block()?,
+            })
         } else {
             self.expr_stmt()
         }
+    }
+
+    fn for_stmt(&mut self) -> Result<Stmt, Error> {
+        self.consume(&TokenType::LeftParen, "Expect '(' after 'for'.")?;
+        let initializer = if self.r#match(&[TokenType::Semicolon]) {
+            None
+        } else if self.r#match(&[TokenType::Var]) {
+            Some(self.var_decl()?)
+        } else {
+            Some(self.expr_stmt()?)
+        };
+
+        let condition = if !self.check(&TokenType::Semicolon) {
+            Some(self.expr()?)
+        } else {
+            None
+        };
+        self.consume(&TokenType::Semicolon, "Expect ';' after loop condition.")?;
+
+        let increment = if !self.check(&TokenType::RightParen) {
+            Some(self.expr()?)
+        } else {
+            None
+        };
+
+        self.consume(&TokenType::RightParen, "Expect ')' after for clauses.")?;
+
+        let mut body = self.stmt()?;
+
+        if let Some(expr) = increment {
+            let inc_stmt = Stmt::Expr { expr };
+            body = Stmt::Block {
+                stmts: vec![body, inc_stmt],
+            }
+        }
+
+        body = Stmt::While {
+            cond: condition.unwrap_or(Expr::Literal {
+                value: Object::Bool(true),
+            }),
+            body: Box::new(body),
+        };
+
+        if let Some(init_stmt) = initializer {
+            body = Stmt::Block {
+                stmts: vec![init_stmt, body],
+            }
+        }
+
+        Ok(body)
+    }
+
+    fn if_stmt(&mut self) -> Result<Stmt, Error> {
+        self.consume(&TokenType::LeftParen, "Expect '(' after 'if'.")?;
+        let cond = self.expr()?;
+        self.consume(&TokenType::RightParen, "Expect ')' after if condition.")?;
+
+        let then = Box::new(self.stmt()?);
+        let r#else = if self.r#match(&[TokenType::Else]) {
+            Box::new(Some(self.stmt()?))
+        } else {
+            Box::new(None)
+        };
+
+        Ok(Stmt::If { cond, then, r#else })
+    }
+
+    fn while_stmt(&mut self) -> Result<Stmt, Error> {
+        self.consume(&TokenType::LeftParen, "Expect '(' after 'while'.")?;
+        let cond = self.expr()?;
+        self.consume(&TokenType::RightParen, "Expect ')' after condition.")?;
+        let body = Box::new(self.stmt()?);
+        Ok(Stmt::While { cond, body })
     }
 
     fn print_stmt(&mut self) -> Result<Stmt, Error> {
         let expr = self.expr()?;
         self.consume(&TokenType::Semicolon, "expected ';' after value.")?;
         Ok(Stmt::Print { expr })
+    }
+
+    fn block(&mut self) -> Result<Vec<Stmt>, Error> {
+        let mut stmts = vec![];
+
+        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+            stmts.push(self.decl()?);
+        }
+
+        self.consume(&TokenType::RightBrace, "Expect '}' after block.")?;
+        Ok(stmts)
     }
 
     fn expr(&mut self) -> Result<Expr, Error> {

@@ -25,6 +25,9 @@ pub enum Opcode {
     EqEq,
     And,
     Or,
+    Jump(usize),
+    JumpIfFalse(usize),
+    Pop,
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -69,6 +72,39 @@ impl StmtVisitor<()> for BcInterpreter {
     fn visit_print_stmt(&mut self, expr: &Expr) -> Result<(), Error> {
         self.eval_expr(expr)?;
         self.ops.push(Opcode::Print);
+        Ok(())
+    }
+
+    fn visit_if_stmt(
+        &mut self,
+        cond: &Expr,
+        then: &Stmt,
+        r#else: &Option<Stmt>,
+    ) -> Result<(), Error> {
+        // eval the cond
+        self.eval_expr(cond)?;
+        // we want to jump over the if branch by this amount if false (take the else)
+        self.ops.push(Opcode::JumpIfFalse(2));
+        self.ops.push(Opcode::Pop);
+        // otherwise, take the true branch.
+        self.eval_stmt(then)?;
+        // If there is an else, we want to eval it and skip over it if the top was true
+        if let Some(else_branch) = r#else {
+            self.ops.push(Opcode::Jump(2));
+            self.ops.push(Opcode::Pop);
+            self.eval_stmt(else_branch)?;
+        }
+        Ok(())
+    }
+
+    fn visit_while_stmt(&mut self, cond: &Expr, body: &Stmt) -> Result<(), Error> {
+        todo!()
+    }
+
+    fn visit_block_stmt(&mut self, stmts: &[Stmt]) -> Result<(), Error> {
+        for stmt in stmts {
+            self.eval_stmt(stmt)?;
+        }
         Ok(())
     }
 }
