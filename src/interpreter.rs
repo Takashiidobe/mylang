@@ -83,6 +83,19 @@ impl StmtVisitor<()> for AstInterpreter {
         }
         Ok(())
     }
+
+    fn visit_function_stmt(
+        &mut self,
+        name: &Token,
+        params: &[Token],
+        body: &[Stmt],
+    ) -> Result<(), Error> {
+        todo!()
+    }
+
+    fn visit_return_stmt(&mut self, keyword: &Token, value: &Option<Expr>) -> Result<(), Error> {
+        todo!()
+    }
 }
 
 impl ExprVisitor<Object> for AstInterpreter {
@@ -182,5 +195,14 @@ impl ExprVisitor<Object> for AstInterpreter {
         } else {
             Ok(Object::Nil)
         }
+    }
+
+    fn visit_call_expr(
+        &mut self,
+        callee: &Expr,
+        paren: &Token,
+        arguments: &[Expr],
+    ) -> Result<Object, Error> {
+        todo!()
     }
 }

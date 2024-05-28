@@ -99,6 +99,23 @@ impl StmtVisitor<String> for AstPrinter {
         s.pop();
         Ok(s)
     }
+
+    fn visit_function_stmt(
+        &mut self,
+        name: &Token,
+        params: &[Token],
+        body: &[Stmt],
+    ) -> Result<String, Error> {
+        todo!()
+    }
+
+    fn visit_return_stmt(
+        &mut self,
+        keyword: &Token,
+        value: &Option<Expr>,
+    ) -> Result<String, Error> {
+        todo!()
+    }
 }
 
 impl ExprVisitor<String> for AstPrinter {
@@ -138,6 +155,17 @@ impl ExprVisitor<String> for AstPrinter {
 
     fn visit_var_expr(&mut self, op: &Token) -> Result<String, Error> {
         Ok(op.to_string())
+    }
+
+    fn visit_call_expr(
+        &mut self,
+        callee: &Expr,
+        paren: &Token,
+        arguments: &[Expr],
+    ) -> Result<String, Error> {
+        let mut aggregated = vec![callee];
+        aggregated.extend(arguments.iter());
+        self.parenthesize(paren.lexeme.clone(), &aggregated)
     }
 }
 

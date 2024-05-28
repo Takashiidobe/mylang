@@ -107,6 +107,19 @@ impl StmtVisitor<()> for BcInterpreter {
         }
         Ok(())
     }
+
+    fn visit_function_stmt(
+        &mut self,
+        name: &Token,
+        params: &[Token],
+        body: &[Stmt],
+    ) -> Result<(), Error> {
+        todo!()
+    }
+
+    fn visit_return_stmt(&mut self, keyword: &Token, value: &Option<Expr>) -> Result<(), Error> {
+        todo!()
+    }
 }
 
 impl ExprVisitor<()> for BcInterpreter {
@@ -210,5 +223,14 @@ impl ExprVisitor<()> for BcInterpreter {
     fn visit_var_expr(&mut self, op: &Token) -> Result<(), Error> {
         self.ops.push(Opcode::Load(op.clone()));
         Ok(())
+    }
+
+    fn visit_call_expr(
+        &mut self,
+        callee: &Expr,
+        paren: &Token,
+        arguments: &[Expr],
+    ) -> Result<(), Error> {
+        todo!()
     }
 }

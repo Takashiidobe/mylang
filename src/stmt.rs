@@ -19,6 +19,15 @@ pub enum Stmt {
     Print {
         expr: Expr,
     },
+    Function {
+        name: Token,
+        params: Vec<Token>,
+        body: Vec<Stmt>,
+    },
+    Return {
+        keyword: Token,
+        value: Option<Expr>,
+    },
     If {
         cond: Expr,
         then: Box<Stmt>,
@@ -42,6 +51,13 @@ pub trait StmtVisitor<R> {
     ) -> Result<R, Error>;
     fn visit_while_stmt(&mut self, cond: &Expr, body: &Stmt) -> Result<R, Error>;
     fn visit_block_stmt(&mut self, stmts: &[Stmt]) -> Result<R, Error>;
+    fn visit_function_stmt(
+        &mut self,
+        name: &Token,
+        params: &[Token],
+        body: &[Stmt],
+    ) -> Result<R, Error>;
+    fn visit_return_stmt(&mut self, keyword: &Token, value: &Option<Expr>) -> Result<R, Error>;
 }
 
 impl Stmt {
@@ -53,6 +69,11 @@ impl Stmt {
             Stmt::Print { expr } => visitor.visit_print_stmt(expr),
             Stmt::If { cond, then, r#else } => visitor.visit_if_stmt(cond, then, r#else),
             Stmt::While { cond, body } => visitor.visit_while_stmt(cond, body),
+
+            Stmt::Function { name, params, body } => {
+                visitor.visit_function_stmt(name, params, body)
+            }
+            Stmt::Return { keyword, value } => visitor.visit_return_stmt(keyword, value),
         }
     }
 }

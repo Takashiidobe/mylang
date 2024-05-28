@@ -36,6 +36,11 @@ pub enum Expr {
     Grouping {
         expr: Box<Expr>,
     },
+    Call {
+        callee: Box<Expr>,
+        paren: Token,
+        arguments: Vec<Expr>,
+    },
 }
 
 pub trait ExprVisitor<R> {
@@ -46,6 +51,12 @@ pub trait ExprVisitor<R> {
     fn visit_logical_expr(&mut self, left: &Expr, op: &Token, right: &Expr) -> Result<R, Error>;
     fn visit_assign_expr(&mut self, name: &Token, expr: &Expr) -> Result<R, Error>;
     fn visit_var_expr(&mut self, op: &Token) -> Result<R, Error>;
+    fn visit_call_expr(
+        &mut self,
+        callee: &Expr,
+        paren: &Token,
+        arguments: &[Expr],
+    ) -> Result<R, Error>;
 }
 
 impl Expr {
@@ -58,6 +69,11 @@ impl Expr {
             Expr::Grouping { expr } => visitor.visit_grouping_expr(expr),
             Expr::Logical { left, op, right } => visitor.visit_logical_expr(left, op, right),
             Expr::Var { name } => visitor.visit_var_expr(name),
+            Expr::Call {
+                callee,
+                paren,
+                arguments,
+            } => visitor.visit_call_expr(callee, paren, arguments),
         }
     }
 }
