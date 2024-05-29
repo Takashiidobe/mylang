@@ -13,7 +13,6 @@ pub struct Codegen {
     instructions: Vec<AsmInstruction>,
     label_count: u64,
     stack_offset: i64,
-    f_offset: i64,
     pub vars: HashMap<Token, i64>,
 }
 
@@ -149,7 +148,6 @@ impl fmt::Display for AsmInstruction {
 impl Codegen {
     pub fn new() -> Self {
         Self {
-            f_offset: -8,
             ..Default::default()
         }
     }
@@ -208,11 +206,6 @@ impl Codegen {
     fn pop(&mut self, reg: Reg) -> AsmInstruction {
         self.depth -= 1;
         AsmInstruction::Pop(reg)
-    }
-
-    fn fn_offset(&mut self) -> i64 {
-        self.f_offset -= 8;
-        self.f_offset
     }
 
     fn offset(&mut self) -> i64 {
@@ -303,7 +296,11 @@ impl Codegen {
                 ));
 
                 res.push(AsmInstruction::Sub(
-                    Address::Immediate((params.len() + 2) as f64 * 8.0),
+                    if params.len() < 6 {
+                        Address::Immediate((params.len() + 2) as f64 * 8.0)
+                    } else {
+                        Address::Immediate(64.0)
+                    },
                     Reg::Rsp,
                 ));
 
@@ -314,19 +311,21 @@ impl Codegen {
                 ));
 
                 for (i, reg) in ARG_REGS.iter().enumerate() {
-                    res.push(AsmInstruction::Mov(
-                        Address::Reg(reg.clone()),
-                        Address::IndirectOffset((i as i64 + 2) * -8, Reg::Rbp),
-                    ));
+                    // we only set args if needed
+                    if i < params.len() {
+                        res.push(AsmInstruction::Mov(
+                            Address::Reg(reg.clone()),
+                            Address::IndirectOffset((i as i64 + 2) * -8, Reg::Rbp),
+                        ));
+                    }
                 }
 
-                // reset the function offset since we're in a new function
-                self.f_offset = -8;
-
-                for param in params {
-                    let offset = self.fn_offset();
-                    // currently treating all function params as globals, would be nice to refactor
-                    // vars to have scope as well so all func vars wouldn't become global
+                for (i, param) in params.iter().enumerate() {
+                    let offset = if i < 6 {
+                        (i as i64 + 2) * -8
+                    } else {
+                        (i as i64 - 4) * 8
+                    };
                     self.vars.insert(param.clone(), offset);
                 }
 
@@ -577,7 +576,10 @@ impl Codegen {
                     res.push(self.push());
                 }
                 for i in (0..arguments.len()).rev() {
-                    res.push(self.pop(ARG_REGS[i].clone()));
+                    // we only need to pop the first 6 registers
+                    if i < 6 {
+                        res.push(self.pop(ARG_REGS[i].clone()));
+                    }
                 }
                 res.push(AsmInstruction::Mov(
                     Address::Immediate(0.0),
