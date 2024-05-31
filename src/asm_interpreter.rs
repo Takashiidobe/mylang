@@ -15,7 +15,7 @@ pub struct Codegen {
     label_count: u64,
     anon_count: u64,
     stack_offset: i64,
-    pub vars: HashMap<Token, (OffsetOrLabel, ObjType)>,
+    pub vars: HashMap<String, (OffsetOrLabel, ObjType)>,
     pub functions: HashMap<Token, ObjType>,
     pub labels: HashMap<String, String>,
     strings: Vec<AsmInstruction>,
@@ -276,7 +276,8 @@ impl Codegen {
                 };
                 let offset = self.offset(None, r_type);
 
-                self.vars.insert(name.clone(), (offset.clone(), r_type));
+                self.vars
+                    .insert(name.lexeme.clone(), (offset.clone(), r_type));
                 match offset {
                     OffsetOrLabel::Offset(off) => {
                         res.push(AsmInstruction::Mov(
@@ -292,7 +293,7 @@ impl Codegen {
                 let (mut res, r_type) = self.expr(expr);
 
                 if let Expr::Var { name } = expr {
-                    if let Some(label) = self.vars.get(name) {
+                    if let Some(label) = self.vars.get(&name.lexeme) {
                         match &label.0 {
                             OffsetOrLabel::Label(_) => {
                                 res.push(AsmInstruction::Comment("accessing string".to_string()));
@@ -304,7 +305,7 @@ impl Codegen {
                     }
                 }
 
-                if r_type == ObjType::Number {
+                if r_type == ObjType::Number || r_type == ObjType::Bool || r_type == ObjType::Nil {
                     res.push(AsmInstruction::Mov(
                         Address::Label("format".to_string()),
                         Address::Reg(Reg::Rdi),
@@ -390,7 +391,7 @@ impl Codegen {
                         (i as i64 - 4) * 8
                     };
                     self.vars.insert(
-                        param.clone(),
+                        param.lexeme.clone(),
                         (OffsetOrLabel::Offset(offset), ObjType::Number),
                     );
                 }
@@ -429,34 +430,40 @@ impl Codegen {
                     ObjType::Number,
                 ),
                 Object::String(string) => {
-                    let label = match self
-                        .offset(Some(Object::String(string.to_string())), ObjType::String)
-                    {
-                        OffsetOrLabel::Label(l) => l,
-                        _ => unreachable!(),
-                    };
-                    let mut res = vec![
-                        AsmInstruction::Variable("globl".to_string(), Some(label.clone())),
-                        AsmInstruction::Label(label.clone()),
-                    ];
-                    // set the label here
-                    self.labels.insert(string.to_string(), label.to_string());
+                    // if the label already exists, don't re-emit it, since this causes a
+                    // compilation error
+                    if self.labels.contains_key(string) {
+                        (vec![], ObjType::String)
+                    } else {
+                        let label = match self
+                            .offset(Some(Object::String(string.to_string())), ObjType::String)
+                        {
+                            OffsetOrLabel::Label(l) => l,
+                            _ => unreachable!(),
+                        };
+                        let mut res = vec![
+                            AsmInstruction::Variable("globl".to_string(), Some(label.clone())),
+                            AsmInstruction::Label(label.clone()),
+                        ];
+                        // set the label here
+                        self.labels.insert(string.to_string(), label.to_string());
 
-                    for b in string.bytes() {
-                        res.push(AsmInstruction::Byte(b));
+                        for b in string.bytes() {
+                            res.push(AsmInstruction::Byte(b));
+                        }
+
+                        res.push(AsmInstruction::Byte(0));
+
+                        self.strings.extend(res);
+
+                        (
+                            vec![AsmInstruction::Lea(
+                                Address::LabelOffset(label, Reg::Rip),
+                                Address::Reg(Reg::Rax),
+                            )],
+                            ObjType::String,
+                        )
                     }
-
-                    res.push(AsmInstruction::Byte(0));
-
-                    self.strings.extend(res);
-
-                    (
-                        vec![AsmInstruction::Lea(
-                            Address::LabelOffset(label, Reg::Rip),
-                            Address::Reg(Reg::Rax),
-                        )],
-                        ObjType::String,
-                    )
                 }
                 _ => todo!(),
             },
@@ -645,7 +652,7 @@ impl Codegen {
             Expr::Var { name } => {
                 let (res, r_type) = self
                     .vars
-                    .get(name)
+                    .get(&name.lexeme)
                     .unwrap_or_else(|| panic!("could not find var {name}"));
                 match res {
                     OffsetOrLabel::Offset(offset) => (
@@ -694,7 +701,7 @@ impl Codegen {
     }
 
     fn add_offset(&mut self, name: &Token) -> Vec<AsmInstruction> {
-        let offset = self.vars.get(name);
+        let offset = self.vars.get(&name.lexeme);
 
         if let Some((offset, _)) = offset {
             match offset {

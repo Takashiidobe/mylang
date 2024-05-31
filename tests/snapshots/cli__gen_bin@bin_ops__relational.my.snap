@@ -1,0 +1,22 @@
+---
+source: tests/cli.rs
+info:
+  program: relational.my.out
+  args: []
+input_file: tests/input/bin_ops/relational.my
+---
+success: true
+exit_code: 0
+----- stdout -----
+1
+0
+1
+0
+1
+0
+1
+0
+0
+1
+
+----- stderr -----

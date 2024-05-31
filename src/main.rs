@@ -94,6 +94,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let stmts = parser.parse();
         let mut codegen = Codegen::new();
         let instructions = codegen.program(&stmts?);
+        dbg!(&instructions);
         for instruction in instructions {
             println!("{}", instruction);
         }
