@@ -121,6 +121,7 @@ pub enum AsmInstruction {
     Byte(u8),
     Leave,
     Comment(String),
+    Asciz(String),
 }
 
 impl fmt::Display for AsmInstruction {
@@ -162,6 +163,7 @@ impl fmt::Display for AsmInstruction {
             Byte(b) => f.write_fmt(format_args!("  .byte {}", b)),
             Leave => f.write_fmt(format_args!("  leave")),
             Comment(comment) => f.write_fmt(format_args!("  # {}", comment)),
+            Asciz(bytes) => f.write_fmt(format_args!("  .asciz \"{}\"", bytes)),
         }
     }
 }
@@ -445,14 +447,9 @@ impl Codegen {
                             AsmInstruction::Variable("globl".to_string(), Some(label.clone())),
                             AsmInstruction::Label(label.clone()),
                         ];
-                        // set the label here
                         self.labels.insert(string.to_string(), label.to_string());
 
-                        for b in string.bytes() {
-                            res.push(AsmInstruction::Byte(b));
-                        }
-
-                        res.push(AsmInstruction::Byte(0));
+                        res.push(AsmInstruction::Asciz(string.to_string()));
 
                         self.strings.extend(res);
 
@@ -706,7 +703,7 @@ impl Codegen {
         if let Some((offset, _)) = offset {
             match offset {
                 OffsetOrLabel::Offset(offset) => {
-                    vec![AsmInstruction::Mov(
+                    vec![AsmInstruction::Lea(
                         Address::IndirectOffset(*offset, Reg::Rbp),
                         Address::Reg(Reg::Rax),
                     )]

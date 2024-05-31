@@ -1,0 +1,12 @@
+var x = 1;
+var y = 2;
+
+if (x == y) {
+	print "x == y";
+} else {
+	if (x != 1) {
+		print "x != 1";
+	} else {
+		print "x == 1";
+	}
+}
