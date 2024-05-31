@@ -3,7 +3,7 @@ use crate::{
     expr::{Expr, ExprVisitor},
     parser::{Evaluate, Interpreter, InterpreterErrors},
     stmt::{Stmt, StmtVisitor},
-    token::{Object, Token, TokenType},
+    token::{ObjType, Object, Token, TokenType},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -113,6 +113,7 @@ impl StmtVisitor<()> for BcInterpreter {
         name: &Token,
         params: &[Token],
         body: &[Stmt],
+        return_type: &ObjType,
     ) -> Result<(), Error> {
         todo!()
     }

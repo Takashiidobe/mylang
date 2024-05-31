@@ -1,4 +1,3 @@
-
 use crate::error::error;
 use std::collections::HashMap;
 
@@ -36,6 +35,9 @@ impl Lexer {
                 ("true".to_string(), TokenType::True),
                 ("var".to_string(), TokenType::Var),
                 ("while".to_string(), TokenType::While),
+                ("num".to_string(), TokenType::NumType),
+                ("str".to_string(), TokenType::StrType),
+                ("bool".to_string(), TokenType::BoolType),
             ]),
             ..Default::default()
         }

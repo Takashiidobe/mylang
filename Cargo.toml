@@ -4,8 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dev-dependencies]
-insta = { version = "1.38.0", features = ["yaml"] }
+insta = { version = "1.38.0", features = ["yaml", "glob"] }
 serde = { version = "1.0.198", features = ["derive"] }
+assert_cmd = "2.0.14"
+insta-cmd = "0.6.0"
 
 [dependencies]
 rustyline = { version = "14.0.0", features = ["derive", "with-file-history"] }
+

@@ -1,0 +1,91 @@
+---
+source: src/lexer.rs
+expression: tokens
+---
+- type: Var
+  lexeme: var
+  literal: ~
+  line: 1
+- type: Identifier
+  lexeme: x
+  literal:
+    String: x
+  line: 1
+- type: Equal
+  lexeme: "="
+  literal: ~
+  line: 1
+- type: Number
+  lexeme: "10"
+  literal:
+    Number: 10
+  line: 1
+- type: Semicolon
+  lexeme: ;
+  literal: ~
+  line: 1
+- type: While
+  lexeme: while
+  literal: ~
+  line: 2
+- type: Identifier
+  lexeme: x
+  literal:
+    String: x
+  line: 2
+- type: LessEqual
+  lexeme: "<="
+  literal: ~
+  line: 2
+- type: Number
+  lexeme: "20"
+  literal:
+    Number: 20
+  line: 2
+- type: LeftBrace
+  lexeme: "{"
+  literal: ~
+  line: 3
+- type: Identifier
+  lexeme: x
+  literal:
+    String: x
+  line: 3
+- type: Plus
+  lexeme: +
+  literal: ~
+  line: 3
+- type: Equal
+  lexeme: "="
+  literal: ~
+  line: 3
+- type: Number
+  lexeme: "1"
+  literal:
+    Number: 1
+  line: 3
+- type: Semicolon
+  lexeme: ;
+  literal: ~
+  line: 3
+- type: Print
+  lexeme: print
+  literal: ~
+  line: 4
+- type: Identifier
+  lexeme: x
+  literal:
+    String: x
+  line: 4
+- type: Semicolon
+  lexeme: ;
+  literal: ~
+  line: 4
+- type: RightBrace
+  lexeme: "}"
+  literal: ~
+  line: 5
+- type: Eof
+  lexeme: "}"
+  literal: ~
+  line: 5

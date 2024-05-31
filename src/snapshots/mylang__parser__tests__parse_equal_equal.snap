@@ -1,21 +1,20 @@
 ---
 source: src/parser.rs
-expression: "Parse::<Expr>::parse(&mut parser).unwrap()"
+expression: parser.parse().unwrap()
 ---
-Binary:
-  left:
-    Literal:
-      value:
-        Number: 1
-  op:
-    type:
-      Op: EqualEqual
-    loc:
-      line: 1
-      col: 2
-    len: 2
-    value: ~
-  right:
-    Literal:
-      value:
-        Number: 2
+- Expr:
+    expr:
+      Binary:
+        left:
+          Literal:
+            value:
+              Number: 1
+        op:
+          type: EqualEqual
+          lexeme: "=="
+          literal: ~
+          line: 1
+        right:
+          Literal:
+            value:
+              Number: 2

@@ -1,37 +1,33 @@
 ---
 source: src/parser.rs
-expression: "Parse::<Expr>::parse(&mut parser).unwrap()"
+expression: parser.parse().unwrap()
 ---
-Binary:
-  left:
-    Grouping:
-      expr:
-        Binary:
-          left:
-            Literal:
-              value:
-                Number: 1
-          op:
-            type:
-              Op: Plus
-            loc:
-              line: 1
-              col: 3
-            len: 1
-            value: ~
-          right:
-            Literal:
-              value:
-                Number: 2
-  op:
-    type:
-      Op: Star
-    loc:
-      line: 1
-      col: 8
-    len: 1
-    value: ~
-  right:
-    Literal:
-      value:
-        Number: 3
+- Expr:
+    expr:
+      Binary:
+        left:
+          Grouping:
+            expr:
+              Binary:
+                left:
+                  Literal:
+                    value:
+                      Number: 1
+                op:
+                  type: Plus
+                  lexeme: +
+                  literal: ~
+                  line: 1
+                right:
+                  Literal:
+                    value:
+                      Number: 2
+        op:
+          type: Star
+          lexeme: "*"
+          literal: ~
+          line: 1
+        right:
+          Literal:
+            value:
+              Number: 3

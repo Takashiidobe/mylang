@@ -3,7 +3,7 @@ use crate::{
     expr::{Expr, ExprVisitor},
     parser::{Evaluate, Interpreter},
     stmt::{Stmt, StmtVisitor},
-    token::{Object, Token},
+    token::{ObjType, Object, Token},
 };
 
 impl Interpreter<String> for AstPrinter {
@@ -105,6 +105,7 @@ impl StmtVisitor<String> for AstPrinter {
         name: &Token,
         params: &[Token],
         body: &[Stmt],
+        return_type: &ObjType,
     ) -> Result<String, Error> {
         todo!()
     }
@@ -189,9 +190,9 @@ mod tests {
         };
     }
 
-    test_printer!(precedence_math, "15 - 3 * 4");
-    test_printer!(parse_true, "true");
-    test_printer!(parse_false, "false");
-    test_printer!(parse_nil, "nil");
-    test_printer!(parse_grouping, "(1 + 2) * 3");
+    test_printer!(precedence_math, "15 - 3 * 4;");
+    test_printer!(parse_true, "true;");
+    test_printer!(parse_false, "false;");
+    test_printer!(parse_nil, "nil;");
+    test_printer!(parse_grouping, "(1 + 2) * 3;");
 }

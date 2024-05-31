@@ -2,7 +2,7 @@ use crate::{
     error::{parser_error, Error},
     expr::{Expr, ExprVisitor},
     stmt::{Stmt, StmtVisitor},
-    token::{Object, Token, TokenType},
+    token::{ObjType, Object, Token, TokenType},
 };
 use std::fmt;
 
@@ -190,6 +190,19 @@ impl Parse for Parser {
 
         self.consume(&TokenType::RightParen, "Expect ')' after parameters.")?;
 
+        self.consume(&TokenType::Minus, "Expect '-' after parameters.")?;
+        self.consume(&TokenType::Greater, "Expect '>' after parameters.")?;
+
+        let return_type = if self.r#match(&[TokenType::NumType]) {
+            ObjType::Number
+        } else if self.r#match(&[TokenType::StrType]) {
+            ObjType::String
+        } else if self.r#match(&[TokenType::BoolType]) {
+            ObjType::Bool
+        } else {
+            ObjType::Nil
+        };
+
         self.consume(
             &TokenType::LeftBrace,
             &format!("Expect '{{' before {} body.", kind),
@@ -197,7 +210,12 @@ impl Parse for Parser {
 
         let body = self.block()?;
 
-        Ok(Stmt::Function { name, params, body })
+        Ok(Stmt::Function {
+            name,
+            params,
+            body,
+            return_type,
+        })
     }
 
     fn if_stmt(&mut self) -> Result<Stmt, Error> {
@@ -604,15 +622,15 @@ mod tests {
         };
     }
 
-    test_parser!(precedence_math, "15 - 3 * 4");
-    test_parser!(grouping, "(1 + 2) * 3");
-    test_parser!(parse_true, "true");
-    test_parser!(parse_false, "false");
-    test_parser!(parse_nil, "nil");
-    test_parser!(parse_bang_equal, "1 != 2");
-    test_parser!(parse_equal_equal, "1 == 2");
-    test_parser!(parse_gt, "1 > 2");
-    test_parser!(parse_ge, "1 >= 2");
-    test_parser!(parse_lt, "1 < 2");
-    test_parser!(parse_le, "1 <= 2");
+    test_parser!(precedence_math, "15 - 3 * 4;");
+    test_parser!(grouping, "(1 + 2) * 3;");
+    test_parser!(parse_true, "true;");
+    test_parser!(parse_false, "false;");
+    test_parser!(parse_nil, "nil;");
+    test_parser!(parse_bang_equal, "1 != 2;");
+    test_parser!(parse_equal_equal, "1 == 2;");
+    test_parser!(parse_gt, "1 > 2;");
+    test_parser!(parse_ge, "1 >= 2;");
+    test_parser!(parse_lt, "1 < 2;");
+    test_parser!(parse_le, "1 <= 2;");
 }

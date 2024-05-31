@@ -1,7 +1,11 @@
 #[cfg(test)]
 use serde::{Deserialize, Serialize};
 
-use crate::{error::Error, expr::Expr, token::Token};
+use crate::{
+    error::Error,
+    expr::Expr,
+    token::{ObjType, Token},
+};
 
 #[cfg_attr(test, derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, PartialEq)]
@@ -23,6 +27,7 @@ pub enum Stmt {
         name: Token,
         params: Vec<Token>,
         body: Vec<Stmt>,
+        return_type: ObjType,
     },
     Return {
         keyword: Token,
@@ -56,6 +61,7 @@ pub trait StmtVisitor<R> {
         name: &Token,
         params: &[Token],
         body: &[Stmt],
+        return_type: &ObjType,
     ) -> Result<R, Error>;
     fn visit_return_stmt(&mut self, keyword: &Token, value: &Option<Expr>) -> Result<R, Error>;
 }
@@ -70,9 +76,12 @@ impl Stmt {
             Stmt::If { cond, then, r#else } => visitor.visit_if_stmt(cond, then, r#else),
             Stmt::While { cond, body } => visitor.visit_while_stmt(cond, body),
 
-            Stmt::Function { name, params, body } => {
-                visitor.visit_function_stmt(name, params, body)
-            }
+            Stmt::Function {
+                name,
+                params,
+                body,
+                return_type,
+            } => visitor.visit_function_stmt(name, params, body, return_type),
             Stmt::Return { keyword, value } => visitor.visit_return_stmt(keyword, value),
         }
     }

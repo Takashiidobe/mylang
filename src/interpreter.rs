@@ -5,7 +5,7 @@ use crate::{
     expr::{Expr, ExprVisitor},
     parser::{Evaluate, Interpreter, InterpreterErrors},
     stmt::{Stmt, StmtVisitor},
-    token::{Object, Token, TokenType},
+    token::{ObjType, Object, Token, TokenType},
 };
 
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -89,6 +89,7 @@ impl StmtVisitor<()> for AstInterpreter {
         name: &Token,
         params: &[Token],
         body: &[Stmt],
+        return_type: &ObjType,
     ) -> Result<(), Error> {
         todo!()
     }

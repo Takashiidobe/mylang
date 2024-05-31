@@ -1,0 +1,41 @@
+---
+source: src/lexer.rs
+expression: tokens
+---
+- type: Fun
+  lexeme: fun
+  literal: ~
+  line: 1
+- type: LeftParen
+  lexeme: (
+  literal: ~
+  line: 1
+- type: RightParen
+  lexeme: )
+  literal: ~
+  line: 1
+- type: LeftBrace
+  lexeme: "{"
+  literal: ~
+  line: 1
+- type: Print
+  lexeme: print
+  literal: ~
+  line: 1
+- type: Number
+  lexeme: "10"
+  literal:
+    Number: 10
+  line: 1
+- type: Semicolon
+  lexeme: ;
+  literal: ~
+  line: 1
+- type: RightBrace
+  lexeme: "}"
+  literal: ~
+  line: 1
+- type: Eof
+  lexeme: "}"
+  literal: ~
+  line: 1

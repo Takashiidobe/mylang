@@ -1,0 +1,13 @@
+---
+source: tests/cli.rs
+info:
+  program: print-str.my.out
+  args: []
+input_file: tests/input/print/print-str.my
+---
+success: true
+exit_code: 0
+----- stdout -----
+hello world
+
+----- stderr -----

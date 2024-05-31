@@ -51,6 +51,9 @@ pub enum TokenType {
     True,
     Var,
     While,
+    NumType,
+    StrType,
+    BoolType,
     #[default]
     Eof,
 }
@@ -118,6 +121,9 @@ impl fmt::Display for Token {
             (TokenType::Identifier, None)
             | (TokenType::String, None)
             | (TokenType::Number, None) => panic!("Invalid token"),
+            (TokenType::NumType, _) => "num".to_string(),
+            (TokenType::StrType, _) => "str".to_string(),
+            (TokenType::BoolType, _) => "bool".to_string(),
         };
 
         f.write_str(&val)
@@ -133,6 +139,16 @@ pub enum Object {
     Identifier(String),
     Bool(bool),
     #[default]
+    Nil,
+}
+
+#[cfg_attr(test, derive(Serialize, Deserialize))]
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ObjType {
+    String,
+    Number,
+    Bool,
     Nil,
 }
 

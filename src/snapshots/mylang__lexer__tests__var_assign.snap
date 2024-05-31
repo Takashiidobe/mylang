@@ -1,0 +1,30 @@
+---
+source: src/lexer.rs
+expression: tokens
+---
+- type: Var
+  lexeme: var
+  literal: ~
+  line: 1
+- type: Identifier
+  lexeme: x
+  literal:
+    String: x
+  line: 1
+- type: Equal
+  lexeme: "="
+  literal: ~
+  line: 1
+- type: Number
+  lexeme: "10"
+  literal:
+    Number: 10
+  line: 1
+- type: Semicolon
+  lexeme: ;
+  literal: ~
+  line: 1
+- type: Eof
+  lexeme: ;
+  literal: ~
+  line: 1

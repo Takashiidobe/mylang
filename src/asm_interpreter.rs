@@ -1,6 +1,7 @@
 use std::borrow::Borrow;
 use std::{collections::HashMap, fmt};
 
+use crate::token::ObjType;
 use crate::{
     expr::Expr,
     stmt::Stmt,
@@ -12,8 +13,12 @@ pub struct Codegen {
     depth: i64,
     instructions: Vec<AsmInstruction>,
     label_count: u64,
+    anon_count: u64,
     stack_offset: i64,
-    pub vars: HashMap<Token, i64>,
+    pub vars: HashMap<Token, (OffsetOrLabel, ObjType)>,
+    pub functions: HashMap<Token, ObjType>,
+    pub labels: HashMap<String, String>,
+    strings: Vec<AsmInstruction>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -28,6 +33,7 @@ pub enum Reg {
     R8,
     R9,
     Al,
+    Rip,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -37,6 +43,13 @@ pub enum Address {
     Immediate(f64),
     Indirect(Reg),
     IndirectOffset(i64, Reg),
+    LabelOffset(String, Reg),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum OffsetOrLabel {
+    Offset(i64),
+    Label(String),
 }
 
 impl fmt::Display for Address {
@@ -49,6 +62,7 @@ impl fmt::Display for Address {
             Address::IndirectOffset(offset, reg) => {
                 f.write_fmt(format_args!("{}({})", offset, reg))
             }
+            Address::LabelOffset(offset, reg) => f.write_fmt(format_args!("{}({})", offset, reg)),
         }
     }
 }
@@ -66,6 +80,7 @@ impl fmt::Display for Reg {
             Reg::Rcx => "%rcx",
             Reg::R8 => "%r8",
             Reg::R9 => "%r9",
+            Reg::Rip => "%rip",
         })
     }
 }
@@ -103,6 +118,9 @@ pub enum AsmInstruction {
     Jne(String),
     Jmp(String),
     Jz(String),
+    Byte(u8),
+    Leave,
+    Comment(String),
 }
 
 impl fmt::Display for AsmInstruction {
@@ -141,6 +159,9 @@ impl fmt::Display for AsmInstruction {
             Je(reg) => f.write_fmt(format_args!("  je {}", reg)),
             Jz(reg) => f.write_fmt(format_args!("  jz {}", reg)),
             Jmp(reg) => f.write_fmt(format_args!("  jmp {}", reg)),
+            Byte(b) => f.write_fmt(format_args!("  .byte {}", b)),
+            Leave => f.write_fmt(format_args!("  leave")),
+            Comment(comment) => f.write_fmt(format_args!("  # {}", comment)),
         }
     }
 }
@@ -166,35 +187,51 @@ impl Codegen {
             }
         }
         let size = self.vars.len();
-        let mut program = vec![];
+        let mut program = vec![AsmInstruction::Variable("text".to_string(), None)];
         let prologue = self.prologue(size);
         let epilogue = self.epilogue();
+
         program.extend(functions);
         program.extend(prologue);
         program.extend(body);
         program.extend(epilogue);
+        if !self.strings.is_empty() {
+            program.push(AsmInstruction::Variable("data".to_string(), None));
+            program.extend(self.strings.clone());
+        }
         program
+    }
+
+    // return a 16 byte aligned stack for rsp
+    // align the number to a multiple
+    // eg. 3 8 byte items aligned to a 16 byte boundary would return 32.
+    fn align_to(&self, size: usize, multiple: usize) -> usize {
+        size.div_ceil(multiple) * multiple
     }
 
     fn prologue(&mut self, size: usize) -> Vec<AsmInstruction> {
         vec![
-            AsmInstruction::Variable("text".to_string(), None),
-            AsmInstruction::Label(".format".to_string()),
-            AsmInstruction::Variable("string".to_string(), Some("\"%d\\n\"".to_string())),
             AsmInstruction::Variable("globl".to_string(), Some("main".to_string())),
             AsmInstruction::Label("main".to_string()),
             AsmInstruction::Push(Reg::Rbp),
             AsmInstruction::Mov(Address::Reg(Reg::Rsp), Address::Reg(Reg::Rbp)),
-            AsmInstruction::Sub(Address::Immediate((size * 8) as f64), Reg::Rsp),
+            AsmInstruction::Sub(
+                Address::Immediate(self.align_to(size * 8, 16) as f64),
+                Reg::Rsp,
+            ),
         ]
     }
 
     fn epilogue(&mut self) -> Vec<AsmInstruction> {
         vec![
-            AsmInstruction::Pop(Reg::Rsp),
-            AsmInstruction::Mov(Address::Reg(Reg::Rbp), Address::Reg(Reg::Rsp)),
-            AsmInstruction::Pop(Reg::Rbp),
+            AsmInstruction::Leave,
+            AsmInstruction::Xor(Reg::Rax, Reg::Rax),
             AsmInstruction::Ret,
+            AsmInstruction::Variable("section".to_string(), Some(".rodata".to_string())),
+            AsmInstruction::Label(".format".to_string()),
+            AsmInstruction::Variable("string".to_string(), Some("\"%d\\n\"".to_string())),
+            AsmInstruction::Label(".format_s".to_string()),
+            AsmInstruction::Variable("string".to_string(), Some("\"%s\\n\"".to_string())),
         ]
     }
 
@@ -208,55 +245,90 @@ impl Codegen {
         AsmInstruction::Pop(reg)
     }
 
-    fn offset(&mut self) -> i64 {
-        self.stack_offset -= 8;
-        self.stack_offset
+    fn offset(&mut self, obj: Option<Object>, obj_type: ObjType) -> OffsetOrLabel {
+        // pass in the object as well
+        // if the object type is a string, we check the labels and just emit that
+        if obj_type == ObjType::Number {
+            self.stack_offset -= 8;
+            OffsetOrLabel::Offset(self.stack_offset)
+        } else if let Some(Object::String(string)) = obj {
+            if let Some(label) = self.labels.get(&string) {
+                OffsetOrLabel::Label(label.to_string())
+            } else {
+                let label = format!(".L.anon.{}", self.get_anon_count());
+                OffsetOrLabel::Label(label)
+            }
+        } else {
+            let label = format!(".L.anon.{}", self.get_anon_count());
+            OffsetOrLabel::Label(label)
+        }
     }
 
     // make it so every expr returns a vector of results
     fn stmt(&mut self, stmt: &Stmt) -> Vec<AsmInstruction> {
         match stmt {
-            Stmt::Expr { expr } => self.expr(expr),
+            Stmt::Expr { expr } => self.expr(expr).0,
             Stmt::Var { name, initializer } => {
-                let mut res = if let Some(init) = initializer {
+                let (mut res, r_type) = if let Some(init) = initializer {
                     self.expr(init)
                 } else {
                     self.expr(&Expr::Literal { value: Object::Nil })
                 };
-                let offset = self.offset();
-                self.vars.insert(name.clone(), offset);
-                res.push(AsmInstruction::Mov(
-                    Address::Reg(Reg::Rax),
-                    Address::IndirectOffset(offset, Reg::Rbp),
-                ));
+                let offset = self.offset(None, r_type);
+
+                self.vars.insert(name.clone(), (offset.clone(), r_type));
+                match offset {
+                    OffsetOrLabel::Offset(off) => {
+                        res.push(AsmInstruction::Mov(
+                            Address::Reg(Reg::Rax),
+                            Address::IndirectOffset(off, Reg::Rbp),
+                        ));
+                    }
+                    OffsetOrLabel::Label(_) => {}
+                }
                 res
             }
             Stmt::Print { expr } => {
-                let mut res = self.expr(expr);
-                res.push(AsmInstruction::Push(Reg::Rsp));
+                let (mut res, r_type) = self.expr(expr);
+
+                if let Expr::Var { name } = expr {
+                    if let Some(label) = self.vars.get(name) {
+                        match &label.0 {
+                            OffsetOrLabel::Label(_) => {
+                                res.push(AsmInstruction::Comment("accessing string".to_string()));
+                            }
+                            OffsetOrLabel::Offset(_) => {
+                                res.push(AsmInstruction::Comment("loading number".to_string()));
+                            }
+                        }
+                    }
+                }
+
+                if r_type == ObjType::Number {
+                    res.push(AsmInstruction::Mov(
+                        Address::Label("format".to_string()),
+                        Address::Reg(Reg::Rdi),
+                    ));
+                } else {
+                    res.push(AsmInstruction::Mov(
+                        Address::Label("format_s".to_string()),
+                        Address::Reg(Reg::Rdi),
+                    ));
+                }
+
                 res.push(AsmInstruction::Mov(
                     Address::Reg(Reg::Rax),
                     Address::Reg(Reg::Rsi),
                 ));
-                res.push(AsmInstruction::Mov(
-                    Address::Label("format".to_string()),
-                    Address::Reg(Reg::Rdi),
-                ));
+
                 res.push(AsmInstruction::Xor(Reg::Rax, Reg::Rax));
                 res.push(AsmInstruction::Call("printf".to_string()));
-                res.push(AsmInstruction::Xor(Reg::Rax, Reg::Rax));
                 res
             }
-            Stmt::Block { stmts } => {
-                let mut res = vec![];
-                for stmt in stmts {
-                    res.extend(self.stmt(stmt));
-                }
-                res
-            }
+            Stmt::Block { stmts } => stmts.iter().flat_map(|x| self.stmt(x)).collect(),
             Stmt::If { cond, then, r#else } => {
                 let count = self.get_count();
-                let mut res = self.expr(cond);
+                let mut res = self.expr(cond).0;
                 res.push(AsmInstruction::Cmp(Address::Immediate(0.0), Reg::Rax));
                 res.push(AsmInstruction::Je(format!(".L.else.{}", count)));
                 res.extend(self.stmt(then));
@@ -274,7 +346,7 @@ impl Codegen {
                 let mut res = vec![];
 
                 res.push(AsmInstruction::Label(format!(".L.begin.{}", count)));
-                res.extend(self.expr(cond));
+                res.extend(self.expr(cond).0);
                 res.push(AsmInstruction::Cmp(Address::Immediate(0.0), Reg::Rax));
                 res.push(AsmInstruction::Je(format!(".L.end.{}", count)));
                 res.extend(self.stmt(body));
@@ -283,31 +355,22 @@ impl Codegen {
 
                 res
             }
-            Stmt::Function { name, body, params } => {
-                let mut res = vec![AsmInstruction::Variable(
-                    "globl".to_string(),
-                    Some(name.to_string()),
-                )];
-                res.push(AsmInstruction::Label(name.to_string()));
-                res.push(AsmInstruction::Push(Reg::Rbp));
-                res.push(AsmInstruction::Mov(
-                    Address::Reg(Reg::Rsp),
-                    Address::Reg(Reg::Rbp),
-                ));
-
+            Stmt::Function {
+                name,
+                body,
+                params,
+                return_type,
+            } => {
+                // add into functions the return type of the function
+                self.functions.insert(name.clone(), *return_type);
+                let mut res = vec![
+                    AsmInstruction::Label(name.to_string()),
+                    AsmInstruction::Push(Reg::Rbp),
+                    AsmInstruction::Mov(Address::Reg(Reg::Rsp), Address::Reg(Reg::Rbp)),
+                ];
                 res.push(AsmInstruction::Sub(
-                    if params.len() < 6 {
-                        Address::Immediate((params.len() + 2) as f64 * 8.0)
-                    } else {
-                        Address::Immediate(64.0)
-                    },
+                    Address::Immediate(self.align_to((params.len() + 2) * 8, 16) as f64),
                     Reg::Rsp,
-                ));
-
-                // we mov the stack pointer into the stack
-                res.push(AsmInstruction::Mov(
-                    Address::Reg(Reg::Rsp),
-                    Address::IndirectOffset(-8, Reg::Rbp),
                 ));
 
                 for (i, reg) in ARG_REGS.iter().enumerate() {
@@ -326,43 +389,74 @@ impl Codegen {
                     } else {
                         (i as i64 - 4) * 8
                     };
-                    self.vars.insert(param.clone(), offset);
+                    self.vars.insert(
+                        param.clone(),
+                        (OffsetOrLabel::Offset(offset), ObjType::Number),
+                    );
                 }
 
                 for stmt in body {
                     res.extend(self.stmt(stmt));
                 }
 
-                res.push(AsmInstruction::Mov(
-                    Address::Reg(Reg::Rbp),
-                    Address::Reg(Reg::Rsp),
-                ));
-                res.push(AsmInstruction::Pop(Reg::Rbp));
+                res.push(AsmInstruction::Leave);
                 res.push(AsmInstruction::Ret);
                 res.extend(self.instructions.clone());
                 res
             }
             Stmt::Return { value, .. } => {
                 if let Some(val) = value {
-                    self.expr(val)
+                    self.expr(val).0
                 } else {
                     self.expr(&Expr::Literal {
                         value: Object::Number(0.0),
                     })
+                    .0
                 }
             }
         }
     }
 
     // every expr should return a Vec<AsmInstruction>
-    fn expr(&mut self, expr: &Expr) -> Vec<AsmInstruction> {
+    fn expr(&mut self, expr: &Expr) -> (Vec<AsmInstruction>, ObjType) {
         match expr {
             Expr::Literal { value } => match value {
-                Object::Number(val) => {
+                Object::Number(val) => (
                     vec![AsmInstruction::Mov(
                         Address::Immediate(*val),
                         Address::Reg(Reg::Rax),
-                    )]
+                    )],
+                    ObjType::Number,
+                ),
+                Object::String(string) => {
+                    let label = match self
+                        .offset(Some(Object::String(string.to_string())), ObjType::String)
+                    {
+                        OffsetOrLabel::Label(l) => l,
+                        _ => unreachable!(),
+                    };
+                    let mut res = vec![
+                        AsmInstruction::Variable("globl".to_string(), Some(label.clone())),
+                        AsmInstruction::Label(label.clone()),
+                    ];
+                    // set the label here
+                    self.labels.insert(string.to_string(), label.to_string());
+
+                    for b in string.bytes() {
+                        res.push(AsmInstruction::Byte(b));
+                    }
+
+                    res.push(AsmInstruction::Byte(0));
+
+                    self.strings.extend(res);
+
+                    (
+                        vec![AsmInstruction::Lea(
+                            Address::LabelOffset(label, Reg::Rip),
+                            Address::Reg(Reg::Rax),
+                        )],
+                        ObjType::String,
+                    )
                 }
                 _ => todo!(),
             },
@@ -378,7 +472,7 @@ impl Codegen {
                     let mut res = self.bin_op_fetch(left, right);
                     res.push(AsmInstruction::Cqo);
                     res.push(AsmInstruction::IDiv(Reg::Rdi, Reg::Rax));
-                    res
+                    (res, ObjType::Number)
                 }
                 Token {
                     r#type: TokenType::Plus,
@@ -386,7 +480,7 @@ impl Codegen {
                 } => {
                     let mut res = self.bin_op_fetch(left, right);
                     res.push(AsmInstruction::Add(Reg::Rdi, Reg::Rax));
-                    res
+                    (res, ObjType::Number)
                 }
                 Token {
                     r#type: TokenType::Minus,
@@ -394,7 +488,7 @@ impl Codegen {
                 } => {
                     let mut res = self.bin_op_fetch(left, right);
                     res.push(AsmInstruction::Sub(Address::Reg(Reg::Rdi), Reg::Rax));
-                    res
+                    (res, ObjType::Number)
                 }
                 Token {
                     r#type: TokenType::Star,
@@ -402,7 +496,7 @@ impl Codegen {
                 } => {
                     let mut res = self.bin_op_fetch(left, right);
                     res.push(AsmInstruction::IMul(Reg::Rdi, Reg::Rax));
-                    res
+                    (res, ObjType::Number)
                 }
                 Token {
                     r#type: TokenType::EqualEqual,
@@ -415,7 +509,7 @@ impl Codegen {
                         Address::Reg(Reg::Al),
                         Address::Reg(Reg::Rax),
                     ));
-                    res
+                    (res, ObjType::Bool)
                 }
                 Token {
                     r#type: TokenType::BangEqual,
@@ -428,7 +522,7 @@ impl Codegen {
                         Address::Reg(Reg::Al),
                         Address::Reg(Reg::Rax),
                     ));
-                    res
+                    (res, ObjType::Bool)
                 }
                 Token {
                     r#type: TokenType::Less,
@@ -441,7 +535,7 @@ impl Codegen {
                         Address::Reg(Reg::Al),
                         Address::Reg(Reg::Rax),
                     ));
-                    res
+                    (res, ObjType::Bool)
                 }
                 Token {
                     r#type: TokenType::LessEqual,
@@ -454,7 +548,7 @@ impl Codegen {
                         Address::Reg(Reg::Al),
                         Address::Reg(Reg::Rax),
                     ));
-                    res
+                    (res, ObjType::Bool)
                 }
                 Token {
                     r#type: TokenType::Greater,
@@ -467,7 +561,7 @@ impl Codegen {
                         Address::Reg(Reg::Al),
                         Address::Reg(Reg::Rax),
                     ));
-                    res
+                    (res, ObjType::Bool)
                 }
                 Token {
                     r#type: TokenType::GreaterEqual,
@@ -480,7 +574,7 @@ impl Codegen {
                         Address::Reg(Reg::Al),
                         Address::Reg(Reg::Rax),
                     ));
-                    res
+                    (res, ObjType::Bool)
                 }
                 _ => todo!(),
             },
@@ -491,9 +585,9 @@ impl Codegen {
                     ..
                 } = op
                 {
-                    let mut res = self.expr(expr);
+                    let (mut res, r_type) = self.expr(expr);
                     res.push(AsmInstruction::Neg(Reg::Rax));
-                    return res;
+                    return (res, r_type);
                 }
                 todo!()
             }
@@ -503,10 +597,10 @@ impl Codegen {
                     ..
                 } => {
                     let count = self.get_count();
-                    let mut res = self.expr(left);
+                    let (mut res, r_type) = self.expr(left);
                     res.push(AsmInstruction::Cmp(Address::Immediate(0.0), Reg::Rax));
                     res.push(AsmInstruction::Je(format!(".L.false.{}", count)));
-                    res.extend(self.expr(right));
+                    res.extend(self.expr(right).0);
                     res.push(AsmInstruction::Cmp(Address::Immediate(0.0), Reg::Rax));
                     res.push(AsmInstruction::Je(format!(".L.false.{}", count)));
                     res.push(AsmInstruction::Mov(
@@ -520,17 +614,17 @@ impl Codegen {
                         Address::Reg(Reg::Rax),
                     ));
                     res.push(AsmInstruction::Label(format!(".L.end.{}", count)));
-                    res
+                    (res, r_type)
                 }
                 Token {
                     r#type: TokenType::Or,
                     ..
                 } => {
                     let count = self.get_count();
-                    let mut res = self.expr(left);
+                    let (mut res, r_type) = self.expr(left);
                     res.push(AsmInstruction::Cmp(Address::Immediate(0.0), Reg::Rax));
                     res.push(AsmInstruction::Jne(format!(".L.true.{}", count)));
-                    res.extend(self.expr(right));
+                    res.extend(self.expr(right).0);
                     res.push(AsmInstruction::Cmp(Address::Immediate(0.0), Reg::Rax));
                     res.push(AsmInstruction::Jne(format!(".L.true.{}", count)));
                     res.push(AsmInstruction::Mov(
@@ -544,69 +638,87 @@ impl Codegen {
                         Address::Reg(Reg::Rax),
                     ));
                     res.push(AsmInstruction::Label(format!(".L.end.{}", count)));
-                    res
+                    (res, r_type)
                 }
                 _ => unreachable!(),
             },
             Expr::Var { name } => {
-                let mut res = self.add_offset(name);
-                res.push(AsmInstruction::Mov(
-                    Address::Indirect(Reg::Rax),
-                    Address::Reg(Reg::Rax),
-                ));
-                res
+                let (res, r_type) = self
+                    .vars
+                    .get(name)
+                    .unwrap_or_else(|| panic!("could not find var {name}"));
+                match res {
+                    OffsetOrLabel::Offset(offset) => (
+                        vec![AsmInstruction::Mov(
+                            Address::IndirectOffset(*offset, Reg::Rbp),
+                            Address::Reg(Reg::Rax),
+                        )],
+                        *r_type,
+                    ),
+                    OffsetOrLabel::Label(_) => (vec![], *r_type),
+                }
             }
             Expr::Assign { name, expr } => {
                 let mut res = self.add_offset(name);
                 res.push(self.push());
-                res.extend(self.expr(expr));
+                let (extend, r_type) = self.expr(expr);
+                res.extend(extend);
                 res.push(self.pop(Reg::Rdi));
                 res.push(AsmInstruction::Mov(
                     Address::Reg(Reg::Rax),
                     Address::Indirect(Reg::Rdi),
                 ));
-                res
+                (res, r_type)
             }
             Expr::Call {
                 callee, arguments, ..
             } => {
                 let mut res = vec![];
                 for arg in arguments {
-                    res.extend(self.expr(arg));
+                    res.extend(self.expr(arg).0);
                     res.push(self.push());
                 }
                 for i in (0..arguments.len()).rev() {
-                    // we only need to pop the first 6 registers
                     if i < 6 {
                         res.push(self.pop(ARG_REGS[i].clone()));
                     }
                 }
-                res.push(AsmInstruction::Mov(
-                    Address::Immediate(0.0),
-                    Address::Reg(Reg::Rax),
-                ));
-                match callee.borrow() {
-                    Expr::Var { name } => res.push(AsmInstruction::Call(name.to_string())),
-                    _ => todo!(),
+                if let Expr::Var { name } = callee.borrow() {
+                    res.push(AsmInstruction::Call(name.to_string()));
+                    let r_type = self.functions.get(name).unwrap();
+                    return (res, *r_type);
                 }
-                res
+                todo!()
             }
         }
     }
 
     fn add_offset(&mut self, name: &Token) -> Vec<AsmInstruction> {
-        // each function should have its own variables
         let offset = self.vars.get(name);
 
-        // this can't find locals because we dont have locals
-        if let Some(offset) = offset {
-            vec![AsmInstruction::Lea(
-                Address::IndirectOffset(*offset, Reg::Rbp),
-                Address::Reg(Reg::Rax),
-            )]
+        if let Some((offset, _)) = offset {
+            match offset {
+                OffsetOrLabel::Offset(offset) => {
+                    vec![AsmInstruction::Mov(
+                        Address::IndirectOffset(*offset, Reg::Rbp),
+                        Address::Reg(Reg::Rax),
+                    )]
+                }
+                OffsetOrLabel::Label(label) => {
+                    vec![AsmInstruction::Lea(
+                        Address::LabelOffset(label.to_string(), Reg::Rip),
+                        Address::Reg(Reg::Rax),
+                    )]
+                }
+            }
         } else {
             vec![]
         }
+    }
+
+    fn get_anon_count(&mut self) -> u64 {
+        self.anon_count += 1;
+        self.anon_count - 1
     }
 
     fn get_count(&mut self) -> u64 {
@@ -615,9 +727,9 @@ impl Codegen {
     }
 
     fn bin_op_fetch(&mut self, left: &Expr, right: &Expr) -> Vec<AsmInstruction> {
-        let mut res = self.expr(right);
+        let mut res = self.expr(right).0;
         res.push(self.push());
-        res.extend(self.expr(left));
+        res.extend(self.expr(left).0);
         res.push(self.pop(Reg::Rdi));
         res
     }

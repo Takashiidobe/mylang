@@ -1,0 +1,13 @@
+---
+source: tests/cli.rs
+info:
+  program: print-num-var.my.out
+  args: []
+input_file: tests/input/print/print-num-var.my
+---
+success: true
+exit_code: 0
+----- stdout -----
+10
+
+----- stderr -----

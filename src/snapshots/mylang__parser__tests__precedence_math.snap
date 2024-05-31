@@ -2,34 +2,30 @@
 source: src/parser.rs
 expression: parser.parse().unwrap()
 ---
-Binary:
-  left:
-    Literal:
-      value:
-        Number: 15
-  op:
-    type:
-      Op: Minus
-    loc:
-      line: 1
-      col: 3
-    len: 1
-    value: ~
-  right:
-    Binary:
-      left:
-        Literal:
-          value:
-            Number: 3
-      op:
-        type:
-          Op: Star
-        loc:
+- Expr:
+    expr:
+      Binary:
+        left:
+          Literal:
+            value:
+              Number: 15
+        op:
+          type: Minus
+          lexeme: "-"
+          literal: ~
           line: 1
-          col: 7
-        len: 1
-        value: ~
-      right:
-        Literal:
-          value:
-            Number: 4
+        right:
+          Binary:
+            left:
+              Literal:
+                value:
+                  Number: 3
+            op:
+              type: Star
+              lexeme: "*"
+              literal: ~
+              line: 1
+            right:
+              Literal:
+                value:
+                  Number: 4

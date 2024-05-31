@@ -2,6 +2,8 @@
 source: src/parser.rs
 expression: parser.parse().unwrap()
 ---
-Literal:
-  value:
-    Bool: true
+- Expr:
+    expr:
+      Literal:
+        value:
+          Bool: true

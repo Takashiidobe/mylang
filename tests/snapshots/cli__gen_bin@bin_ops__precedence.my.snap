@@ -1,0 +1,13 @@
+---
+source: tests/cli.rs
+info:
+  program: precedence.my.out
+  args: []
+input_file: tests/input/bin_ops/precedence.my
+---
+success: true
+exit_code: 0
+----- stdout -----
+2
+
+----- stderr -----

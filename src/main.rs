@@ -1,6 +1,7 @@
 use std::borrow::Cow::{self, Borrowed, Owned};
 use std::env::args;
 use std::error::Error;
+use std::fs::read_to_string;
 
 use mylang::asm_interpreter::Codegen;
 use mylang::ast_printer::AstPrinter;
@@ -17,11 +18,12 @@ use rustyline::validate::MatchingBracketValidator;
 use rustyline::{Completer, Helper, Hinter, Validator};
 use rustyline::{CompletionType, Config, EditMode, Editor};
 
-#[derive(Default)]
+#[derive(Debug, Default, Clone, PartialEq, Copy)]
 enum Mode {
     Ast,
     Asm,
     Bc,
+    AsmFile,
     #[default]
     Repl,
 }
@@ -78,10 +80,30 @@ fn main() -> Result<(), Box<dyn Error>> {
             "asm" => {
                 mode = Mode::Asm;
             }
-            _ => {}
+            _ => {
+                mode = Mode::AsmFile;
+            }
         }
     }
 
+    if mode == Mode::AsmFile {
+        let s = read_to_string(args[1].as_str()).expect("Could not find file");
+        let mut lexer = Lexer::new(&s);
+        let tokens = lexer.scan_tokens();
+        let mut parser = Parser::new(tokens.clone());
+        let stmts = parser.parse();
+        let mut codegen = Codegen::new();
+        let instructions = codegen.program(&stmts?);
+        for instruction in instructions {
+            println!("{}", instruction);
+        }
+        Ok(())
+    } else {
+        repl(mode)
+    }
+}
+
+fn repl(mode: Mode) -> Result<(), Box<dyn Error>> {
     let config = Config::builder()
         .history_ignore_space(true)
         .completion_type(CompletionType::List)
@@ -137,6 +159,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             println!("{}", instruction);
                         }
                     }
+                    _ => unreachable!(),
                 }
                 rl.add_history_entry(s.as_str())?;
             }
